@@ -22,6 +22,9 @@ pub struct Cpu {
 enum SR {
     AF, BC, DE              // sandwich registers, read/write 2x8-bit registers as 16bit
 }
+enum Flag {                 // flags, stored as bits in F register
+    C, N, PV, H, Z, S
+}
 
 impl Cpu {
     fn new() -> Self {
@@ -42,6 +45,7 @@ impl Cpu {
         }
     }
 
+    /* SANDWICH REGS {{{ */
     // read from a sandwich register
     fn srr(&self, r: SR) -> u16 {
         match r {
@@ -68,7 +72,66 @@ impl Cpu {
             },
         }
     }
+    /* }}} */
 
+    /* FLAGS {{{ */
+    fn fr(&self, f: Flag) -> bool {
+        fn tob(u: u8) -> bool {
+            match u {
+                0 => false,
+                1 => true,
+                _ => panic!("bad flag extract logic"),
+            }
+        }
+        match f {
+            Flag::C  => tob((self.f & 0b00000001) >> 0),
+            Flag::N  => tob((self.f & 0b00000010) >> 1),
+            Flag::PV => tob((self.f & 0b00000100) >> 2),
+            Flag::H  => tob((self.f & 0b00010000) >> 4),
+            Flag::Z  => tob((self.f & 0b01000000) >> 6),
+            Flag::S  => tob((self.f & 0b10000000) >> 7),
+        }
+    }
+
+    fn fw(&mut self, f: Flag, b: bool) {
+        fn bot(b: bool) -> u8 {
+            match b {
+                false => 0,
+                true  => 1,
+            }
+        }
+        match f {
+            Flag::C  => {
+                self.f &= !(1 << 0);
+                println!("{:0>8b}", self.f);
+                self.f |=  bot(b) << 0;
+                println!("{:0>8b}", self.f);
+            }
+            Flag::N  => {
+                self.f &= !(1 << 1);
+                self.f |= bot(b) << 1;
+            }
+            Flag::PV => {
+                self.f &= !(1 << 2);
+                self.f |= bot(b) << 2;
+            }
+            Flag::H  => {
+                self.f &= !(1 << 4);
+                self.f |= bot(b) << 4;
+            }
+            Flag::Z  => {
+                self.f &= !(1 << 6);
+                self.f |= bot(b) << 6;
+            }
+            Flag::S  => {
+                self.f &= !(1 << 7);
+                self.f |= bot(b) << 7;
+            }
+        }
+    }
+    /* }}} */
+
+    /* MEMORY {{{ */
     fn write(&mut self, x: usize, v: u8) -> Result<(), Error> {
         match x {
             0x0000..=0x7fff => Ok(()), // write to ROM has no action
@@ -85,6 +148,7 @@ impl Cpu {
             _ => Err(Error::new(ErrorKind::InvalidData, "read outside memory"))
         }
     }
+    /* }}} */
 
     fn reset(&mut self) {
         self.a      = 0x00;

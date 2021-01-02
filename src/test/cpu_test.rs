@@ -114,3 +114,47 @@ fn test_reset() {
     assert_eq!(c.sp, 0x0000);
     assert_eq!(&c.ram[..], [0; RAM_SIZE]);
 }
+
+#[test]
+fn test_flags() {
+    let mut c = Cpu::new();
+
+    // flag writes
+    c.fw(Flag::C, true);
+    assert_eq!(c.f & 0b00000001, 0b00000001);
+    c.fw(Flag::N, true);
+    assert_eq!(c.f & 0b00000010, 0b00000010);
+    c.fw(Flag::PV, true);
+    assert_eq!(c.f & 0b00000100, 0b00000100);
+    c.fw(Flag::H, true);
+    assert_eq!(c.f & 0b00010000, 0b00010000);
+    c.fw(Flag::Z, true);
+    assert_eq!(c.f & 0b01000000, 0b01000000);
+    c.fw(Flag::S, true);
+    assert_eq!(c.f & 0b10000000, 0b10000000);
+
+    // flag reads
+    assert_eq!(c.fr(Flag::C), true); // C
+    c.fw(Flag::C, false);
+    assert_eq!(c.fr(Flag::C), false);
+
+    assert_eq!(c.fr(Flag::N), true); // N
+    c.fw(Flag::N, false);
+    assert_eq!(c.fr(Flag::N), false); 
+
+    assert_eq!(c.fr(Flag::PV), true); // PV
+    c.fw(Flag::PV, false);
+    assert_eq!(c.fr(Flag::PV), false);
+
+    assert_eq!(c.fr(Flag::H), true); // H
+    c.fw(Flag::H, false);
+    assert_eq!(c.fr(Flag::H), false);
+
+    assert_eq!(c.fr(Flag::Z), true); // Z
+    c.fw(Flag::Z, false);
+    assert_eq!(c.fr(Flag::Z), false);
+
+    assert_eq!(c.fr(Flag::S), true); // S
+    c.fw(Flag::S, false);
+    assert_eq!(c.fr(Flag::S), false);
+}
