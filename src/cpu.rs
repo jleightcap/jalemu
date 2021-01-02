@@ -327,6 +327,7 @@ impl Cpu {
     /* DECODE {{{ */
     fn decode(&self, instr: u8) -> Result<Instr, Error> {
         match instr {
+            /* 0x0X {{{ */
             0x00 => Ok(Instr::NOP),
             0x01 => Ok(Instr::LD16(
                         Arg16::Reg(SR::BC),
@@ -376,6 +377,8 @@ impl Cpu {
                         Arg8::U8
                     )),
             0x0f => Ok(Instr::RRCA),
+            /* }}} */
+            /* 0x1X {{{ */
             0x10 => Ok(Instr::DJNZ(
                         Arg8::U8
                     )),
@@ -427,6 +430,8 @@ impl Cpu {
                         Arg8::U8
                     )),
             0x1f => Ok(Instr::RRA),
+            /* }}} */
+            /* 0x2X {{{ */
             0x20 => Ok(Instr::JR(
                         ArgF::NF(Flag::Z),
                         Arg8::U8
@@ -479,6 +484,8 @@ impl Cpu {
                         Arg8::U8
                     )),
             0x2f => Ok(Instr::CPL),
+            /* }}} */
+            /* 0x3X {{{ */
             0x30 => Ok(Instr::JR(
                         ArgF::NF(Flag::C),
                         Arg8::U8
@@ -531,6 +538,73 @@ impl Cpu {
                         Arg8::U8
                     )),
             0x3f => Ok(Instr::CCF),
+            /* }}} */
+            /* 0x4X {{{ */
+            0x40 => Ok(Instr::LD8(
+                        Arg8::Reg(R::B),
+                        Arg8::Reg(R::B)
+                    )),
+            0x41 => Ok(Instr::LD8(
+                        Arg8::Reg(R::B),
+                        Arg8::Reg(R::C)
+                    )),
+            0x42 => Ok(Instr::LD8(
+                        Arg8::Reg(R::B),
+                        Arg8::Reg(R::D)
+                    )),
+            0x43 => Ok(Instr::LD8(
+                        Arg8::Reg(R::B),
+                        Arg8::Reg(R::E)
+                    )),
+            0x44 => Ok(Instr::LD8(
+                        Arg8::Reg(R::B),
+                        Arg8::Reg(R::H)
+                    )),
+            0x45 => Ok(Instr::LD8(
+                        Arg8::Reg(R::B),
+                        Arg8::Reg(R::L)
+                    )),
+            0x46 => Ok(Instr::LD8(
+                        Arg8::Reg(R::B),
+                        Arg8::Mem(MemAddr::Reg(SR::HL))
+                    )),
+            0x47 => Ok(Instr::LD8(
+                        Arg8::Reg(R::B),
+                        Arg8::Reg(R::A)
+                    )),
+            0x48 => Ok(Instr::LD8(
+                        Arg8::Reg(R::C),
+                        Arg8::Reg(R::B)
+                    )),
+            0x49 => Ok(Instr::LD8(
+                        Arg8::Reg(R::C),
+                        Arg8::Reg(R::C)
+                    )),
+            0x4a => Ok(Instr::LD8(
+                        Arg8::Reg(R::C),
+                        Arg8::Reg(R::D)
+                    )),
+            0x4b => Ok(Instr::LD8(
+                        Arg8::Reg(R::C),
+                        Arg8::Reg(R::E)
+                    )),
+            0x4c => Ok(Instr::LD8(
+                        Arg8::Reg(R::C),
+                        Arg8::Reg(R::H)
+                    )),
+            0x4d => Ok(Instr::LD8(
+                        Arg8::Reg(R::C),
+                        Arg8::Reg(R::L)
+                    )),
+            0x4e => Ok(Instr::LD8(
+                        Arg8::Reg(R::C),
+                        Arg8::Mem(MemAddr::Reg(SR::HL))
+                    )),
+            0x4f => Ok(Instr::LD8(
+                        Arg8::Reg(R::C),
+                        Arg8::Reg(R::A)
+                    )),
+            /* }}} */
 
             _ => Err(Error::new(ErrorKind::InvalidData, "unexpected opcode")),
         }
