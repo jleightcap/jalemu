@@ -34,6 +34,7 @@ enum SR {
 }
 
 // flags, stored as bits in F register
+#[derive(Debug, PartialEq)]
 enum Flag {
     S, Z, /* gap */ H, /* gap */ PV, N, C
 }
@@ -49,6 +50,7 @@ enum PC {
 }
 
 /* INSTRUCTIONS {{{ */
+
 // methods if indexing memory
 #[derive(Debug, PartialEq)]
 enum MemAddr {
@@ -89,17 +91,29 @@ enum Arg8 {
 enum Arg16 {
     U16,
     Reg(SR),
+    Mem(MemAddr),
+}
+
+// opcode argument for flags
+#[derive(Debug, PartialEq)]
+enum ArgF {
+    True,       // always (jr *)
+    F(Flag),    // conditional (jr z, *)
+    NF(Flag),   // opposite conditonal (jr nz, *)
 }
 
 #[derive(Debug, PartialEq)]
 enum Instr {
     ADD16   (Arg16, Arg16),
+    CPL,
+    DAA,
     DEC8    (Arg8),
     DEC16   (Arg16),
     DJNZ    (Arg8),
+    EX      (Arg16, Arg16),
     INC8    (Arg8),
     INC16   (Arg16),
-    JR      (Arg8),
+    JR      (ArgF, Arg8),
     LD8     (Arg8, Arg8),
     LD16    (Arg16, Arg16),
     NOP,
@@ -212,7 +226,7 @@ impl Cpu {
     /* }}} */
 
     /* FLAGS {{{ */
-    fn fr(&self, f: Flag) -> bool {
+    fn fr(&self, f: &Flag) -> bool {
         fn tob(u: u8) -> bool {
             match u {
                 0 => false,
@@ -230,7 +244,7 @@ impl Cpu {
         }
     }
 
-    fn fw(&mut self, f: Flag, b: bool) {
+    fn fw(&mut self, f: &Flag, b: bool) {
         fn bot(b: bool) -> u8 {
             match b {
                 false => 0,
@@ -328,7 +342,10 @@ impl Cpu {
                         Arg8::U8
                     )),
             0x07 => Ok(Instr::RLCA),
-            0x08 => panic!("TODO: ex af, af'"),
+            0x08 => Ok(Instr::EX(
+                        Arg16::Reg(SR::AF),
+                        Arg16::Reg(SR::AF)  // TODO: shadow registers
+                    )),
             0x09 => Ok(Instr::ADD16(
                         Arg16::Reg(SR::HL),
                         Arg16::Reg(SR::BC)
@@ -377,6 +394,7 @@ impl Cpu {
                     )),
             0x17 => Ok(Instr::RLA),
             0x18 => Ok(Instr::JR(
+                        ArgF::True,
                         Arg8::U8
                     )),
             0x19 => Ok(Instr::ADD16(
@@ -401,6 +419,58 @@ impl Cpu {
                         Arg8::U8
                     )),
             0x1f => Ok(Instr::RRA),
+            0x20 => Ok(Instr::JR(
+                        ArgF::NF(Flag::Z),
+                        Arg8::U8
+                    )),
+            0x21 => Ok(Instr::LD16(
+                        Arg16::Reg(SR::HL),
+                        Arg16::U16
+                    )),
+            0x22 => Ok(Instr::LD16(
+                        Arg16::Mem(MemAddr::Imm),
+                        Arg16::Reg(SR::HL)
+                    )),
+            0x23 => Ok(Instr::INC16(
+                        Arg16::Reg(SR::HL)
+                    )),
+            0x24 => Ok(Instr::INC8(
+                        Arg8::Reg(R::H)
+                    )),
+            0x25 => Ok(Instr::DEC8(
+                        Arg8::Reg(R::H)
+                    )),
+            0x26 => Ok(Instr::LD8(
+                        Arg8::Reg(R::H),
+                        Arg8::U8
+                    )),
+            0x27 => Ok(Instr::DAA),
+            0x28 => Ok(Instr::JR(
+                        ArgF::F(Flag::Z),
+                        Arg8::U8
+                    )),
+            0x29 => Ok(Instr::ADD16(
+                        Arg16::Reg(SR::HL),
+                        Arg16::Reg(SR::HL)
+                    )),
+            0x2a => Ok(Instr::LD16(
+                        Arg16::Reg(SR::HL),
+                        Arg16::Mem(MemAddr::Imm)
+                    )),
+            0x2b => Ok(Instr::DEC16(
+                        Arg16::Reg(SR::HL)
+                    )),
+            0x2c => Ok(Instr::INC8(
+                        Arg8::Reg(R::L)
+                    )),
+            0x2d => Ok(Instr::DEC8(
+                        Arg8::Reg(R::L)
+                    )),
+            0x2e => Ok(Instr::LD8(
+                        Arg8::Reg(R::L),
+                        Arg8::U8
+                    )),
+            0x2f => Ok(Instr::CPL),
 
             _ => Err(Error::new(ErrorKind::InvalidData, "unexpected opcode")),
         }
@@ -410,12 +480,15 @@ impl Cpu {
     fn execute(&mut self, instr: &Instr) -> Result<(), Error> {
         let pc = match instr {
             Instr::ADD16(a1, a2)    => self.add16(a1, a2),
+            Instr::CPL              => self.cpl(),
+            Instr::DAA              => self.daa(),
             Instr::DEC8(a)          => self.dec8(a),
             Instr::DEC16(a)         => self.dec16(a),
             Instr::DJNZ(a)          => self.djnz(a),
+            Instr::EX(a1, a2)       => self.ex(a1, a2),
             Instr::INC8(a)          => self.inc8(a),
             Instr::INC16(a)         => self.inc16(a),
-            Instr::JR(a)            => self.jr(a),
+            Instr::JR(f, a)         => self.jr(f, a),
             Instr::LD8(a1, a2)      => self.ld8(a1, a2),
             Instr::LD16(a1, a2)     => self.ld16(a1, a2),
             Instr::NOP              => self.nop(),
@@ -457,6 +530,7 @@ impl Cpu {
         match a {
             Arg16::U16      => { Ok((self.imm16()?, PC::Im16)) },
             Arg16::Reg(sr)  => { Ok((self.srr(sr), PC::I)) },
+            Arg16::Mem(_)   => Err(Error::new(ErrorKind::InvalidData, "read from immediate")),
         }
     }
 
@@ -467,7 +541,19 @@ impl Cpu {
             Arg16::Reg(sr)  => { self.srw(sr, self.srr(sr).wrapping_add(src)); Ok(pc) }
             // add **, X
             Arg16::U16 => Err(Error::new(ErrorKind::InvalidData, "add to immediate")),
+            // add [**], X
+            Arg16::Mem(_)   => Err(Error::new(ErrorKind::InvalidData, "add from immediate")),
         }
+    }
+
+    fn cpl(&mut self) -> Result<PC, Error> {
+        self.rw(&R::A, self.rr(&R::A) ^ 0xff); // 1's complement
+        Ok(PC::I)
+    }
+
+    fn daa(&mut self) -> Result<PC, Error> {
+        // TODO: BCD
+        Ok(PC::I)
     }
 
     fn dec8(&mut self, dst: &Arg8) -> Result<PC, Error> {
@@ -491,17 +577,26 @@ impl Cpu {
             Arg16::Reg(sr) => { self.srw(sr, self.srr(sr).wrapping_sub(1)); Ok(PC::I) }
             // dec **
             Arg16::U16 => Err(Error::new(ErrorKind::InvalidData, "dec to immediate")),
+            // dec [**]
+            Arg16::Mem(_)   => Err(Error::new(ErrorKind::InvalidData, "dec from immediate")),
         }
     }
 
     fn djnz(&mut self, dst: &Arg8) -> Result<PC, Error> {
-        if self.fr(Flag::Z) {
-            let (dst, _) = self.u8_arg(dst)?;
-            Ok(PC::JR(dst as usize))
+        match self.fr(&Flag::Z) {
+            false => {
+                let (dst, _) = self.u8_arg(dst)?;
+                Ok(PC::JR(dst as usize))
+            }
+            true => {
+                Ok(PC::Im8)
+            }
         }
-        else {
-            Ok(PC::Im8)
-        }
+    }
+
+    fn ex(&mut self, dst: &Arg16, src: &Arg16) -> Result<PC, Error> {
+        // TODO: shadow registers
+        Ok(PC::I)
     }
 
     fn inc8(&mut self, dst: &Arg8) -> Result<PC, Error> {
@@ -522,15 +617,22 @@ impl Cpu {
     fn inc16(&mut self, dst: &Arg16) -> Result<PC, Error> {
         match dst {
             // inc SR
-            Arg16::Reg(sr) => { self.srw(sr, self.srr(sr).wrapping_add(1)); Ok(PC::I) }
+            Arg16::Reg(sr)  => { self.srw(sr, self.srr(sr).wrapping_add(1)); Ok(PC::I) }
             // inc **
-            Arg16::U16 => Err(Error::new(ErrorKind::InvalidData, "inc to immediate")),
+            Arg16::U16      => Err(Error::new(ErrorKind::InvalidData, "inc to immediate")),
+            // inc [**]
+            Arg16::Mem(_)   => Err(Error::new(ErrorKind::InvalidData, "inc to immediate")),
+
         }
     }
 
-    fn jr(&mut self, dst: &Arg8) -> Result<PC, Error> {
+    fn jr(&mut self, f: &ArgF, dst: &Arg8) -> Result<PC, Error> {
         let (dst, _) = self.u8_arg(dst)?;
-        Ok(PC::JR(dst as usize))
+        match f {
+            ArgF::True  => Ok(PC::JR(dst as usize)),
+            ArgF::F(f)  => if  self.fr(f) { Ok(PC::JR(dst as usize)) } else { Ok(PC::Im8) }
+            ArgF::NF(f) => if !self.fr(f) { Ok(PC::JR(dst as usize)) } else { Ok(PC::Im8) }
+        }
     }
 
     fn ld8(&mut self, dst: &Arg8, src: &Arg8) -> Result<PC, Error> {
@@ -556,6 +658,8 @@ impl Cpu {
             Arg16::Reg(sr)  => { self.srw(sr, src); Ok(pc) }
             // ld **, X
             Arg16::U16 => Err(Error::new(ErrorKind::InvalidData, "load to immediate")),
+            // ld [..], X
+            Arg16::Mem(_)   => Err(Error::new(ErrorKind::InvalidData, "load to immediate")),
         }
     }
 
@@ -571,11 +675,11 @@ impl Cpu {
             match t { 0 => false, 1 => true, _ => panic!("bad flag"), }
         }
         let prev = self.rr(&R::A);
-        let cf = self.fr(Flag::C);
+        let cf = self.fr(&Flag::C);
         // rotate left, previous C flag in LSB
         self.rw(&R::A, prev << 1 | bot(cf));
         // previous A MSB in C flag
-        self.fw(Flag::C, tob((prev >> 7) & 0b1));
+        self.fw(&Flag::C, tob((prev >> 7) & 0b1));
         Ok(PC::I)
     }
 
@@ -594,11 +698,11 @@ impl Cpu {
             match t { 0 => false, 1 => true, _ => panic!("bad flag"), }
         }
         let prev = self.rr(&R::A);
-        let cf = self.fr(Flag::C);
+        let cf = self.fr(&Flag::C);
         // rotate right, previous C flag in MSB
         self.rw(&R::A, prev >> 1 | (bot(cf) << 7));
         // previous A LSB in C flag
-        self.fw(Flag::C, tob(prev & 0b1));
+        self.fw(&Flag::C, tob(prev & 0b1));
         Ok(PC::I)
     }
 

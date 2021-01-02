@@ -198,43 +198,43 @@ fn test_flags() {
     let mut c = Cpu::new();
 
     // flag writes
-    c.fw(Flag::C, true);
+    c.fw(&Flag::C, true);
     assert_eq!(c.f & 0b00000001, 0b00000001);
-    c.fw(Flag::N, true);
+    c.fw(&Flag::N, true);
     assert_eq!(c.f & 0b00000010, 0b00000010);
-    c.fw(Flag::PV, true);
+    c.fw(&Flag::PV, true);
     assert_eq!(c.f & 0b00000100, 0b00000100);
-    c.fw(Flag::H, true);
+    c.fw(&Flag::H, true);
     assert_eq!(c.f & 0b00010000, 0b00010000);
-    c.fw(Flag::Z, true);
+    c.fw(&Flag::Z, true);
     assert_eq!(c.f & 0b01000000, 0b01000000);
-    c.fw(Flag::S, true);
+    c.fw(&Flag::S, true);
     assert_eq!(c.f & 0b10000000, 0b10000000);
 
     // flag reads
-    assert_eq!(c.fr(Flag::C), true); // C
-    c.fw(Flag::C, false);
-    assert_eq!(c.fr(Flag::C), false);
+    assert_eq!(c.fr(&Flag::C), true); // C
+    c.fw(&Flag::C, false);
+    assert_eq!(c.fr(&Flag::C), false);
 
-    assert_eq!(c.fr(Flag::N), true); // N
-    c.fw(Flag::N, false);
-    assert_eq!(c.fr(Flag::N), false); 
+    assert_eq!(c.fr(&Flag::N), true); // N
+    c.fw(&Flag::N, false);
+    assert_eq!(c.fr(&Flag::N), false); 
 
-    assert_eq!(c.fr(Flag::PV), true); // PV
-    c.fw(Flag::PV, false);
-    assert_eq!(c.fr(Flag::PV), false);
+    assert_eq!(c.fr(&Flag::PV), true); // PV
+    c.fw(&Flag::PV, false);
+    assert_eq!(c.fr(&Flag::PV), false);
 
-    assert_eq!(c.fr(Flag::H), true); // H
-    c.fw(Flag::H, false);
-    assert_eq!(c.fr(Flag::H), false);
+    assert_eq!(c.fr(&Flag::H), true); // H
+    c.fw(&Flag::H, false);
+    assert_eq!(c.fr(&Flag::H), false);
 
-    assert_eq!(c.fr(Flag::Z), true); // Z
-    c.fw(Flag::Z, false);
-    assert_eq!(c.fr(Flag::Z), false);
+    assert_eq!(c.fr(&Flag::Z), true); // Z
+    c.fw(&Flag::Z, false);
+    assert_eq!(c.fr(&Flag::Z), false);
 
-    assert_eq!(c.fr(Flag::S), true); // S
-    c.fw(Flag::S, false);
-    assert_eq!(c.fr(Flag::S), false);
+    assert_eq!(c.fr(&Flag::S), true); // S
+    c.fw(&Flag::S, false);
+    assert_eq!(c.fr(&Flag::S), false);
 }
 
 #[test]
@@ -257,7 +257,8 @@ fn test_decode_0x0() -> Result<(), Error> {
     assert_eq!(i, Instr::LD8(Arg8::Reg(R::B), Arg8::U8));
     let i = c.decode(0x07)?;
     assert_eq!(i, Instr::RLCA);
-    // TODO: ex af, af'
+    let i = c.decode(0x08)?;
+    assert_eq!(i, Instr::EX(Arg16::Reg(SR::AF), Arg16::Reg(SR::AF)));
     let i = c.decode(0x09)?;
     assert_eq!(i, Instr::ADD16(Arg16::Reg(SR::HL), Arg16::Reg(SR::BC)));
     let i = c.decode(0x0a)?;
@@ -297,7 +298,7 @@ fn test_decode_0x1() -> Result<(), Error> {
     let i = c.decode(0x17)?;
     assert_eq!(i, Instr::RLA);
     let i = c.decode(0x18)?;
-    assert_eq!(i, Instr::JR(Arg8::U8));
+    assert_eq!(i, Instr::JR(ArgF::True, Arg8::U8));
     let i = c.decode(0x19)?;
     assert_eq!(i, Instr::ADD16(Arg16::Reg(SR::HL), Arg16::Reg(SR::DE)));
     let i = c.decode(0x1a)?;
@@ -312,6 +313,46 @@ fn test_decode_0x1() -> Result<(), Error> {
     assert_eq!(i, Instr::LD8(Arg8::Reg(R::E), Arg8::U8));
     let i = c.decode(0x1f)?;
     assert_eq!(i, Instr::RRA);
+
+    Ok(())
+}
+
+#[test]
+fn test_decode_0x2() -> Result<(), Error> {
+    let c = Cpu::new();
+
+    let i = c.decode(0x20)?;
+    assert_eq!(i, Instr::JR(ArgF::NF(Flag::Z), Arg8::U8));
+    let i = c.decode(0x21)?;
+    assert_eq!(i, Instr::LD16(Arg16::Reg(SR::HL), Arg16::U16));
+    let i = c.decode(0x22)?;
+    assert_eq!(i, Instr::LD16(Arg16::Mem(MemAddr::Imm), Arg16::Reg(SR::HL)));
+    let i = c.decode(0x23)?;
+    assert_eq!(i, Instr::INC16(Arg16::Reg(SR::HL)));
+    let i = c.decode(0x24)?;
+    assert_eq!(i, Instr::INC8(Arg8::Reg(R::H)));
+    let i = c.decode(0x25)?;
+    assert_eq!(i, Instr::DEC8(Arg8::Reg(R::H)));
+    let i = c.decode(0x26)?;
+    assert_eq!(i, Instr::LD8(Arg8::Reg(R::H), Arg8::U8));
+    let i = c.decode(0x27)?;
+    assert_eq!(i, Instr::DAA);
+    let i = c.decode(0x28)?;
+    assert_eq!(i, Instr::JR(ArgF::F(Flag::Z), Arg8::U8));
+    let i = c.decode(0x29)?;
+    assert_eq!(i, Instr::ADD16(Arg16::Reg(SR::HL), Arg16::Reg(SR::HL)));
+    let i = c.decode(0x2a)?;
+    assert_eq!(i, Instr::LD16(Arg16::Reg(SR::HL), Arg16::Mem(MemAddr::Imm)));
+    let i = c.decode(0x2b)?;
+    assert_eq!(i, Instr::DEC16(Arg16::Reg(SR::HL)));
+    let i = c.decode(0x2c)?;
+    assert_eq!(i, Instr::INC8(Arg8::Reg(R::L)));
+    let i = c.decode(0x2d)?;
+    assert_eq!(i, Instr::DEC8(Arg8::Reg(R::L)));
+    let i = c.decode(0x2e)?;
+    assert_eq!(i, Instr::LD8(Arg8::Reg(R::L), Arg8::U8));
+    let i = c.decode(0x2f)?;
+    assert_eq!(i, Instr::CPL);
 
     Ok(())
 }
@@ -513,12 +554,12 @@ fn test_execute_rrca() -> Result<(), Error> {
 fn test_execute_rla() -> Result<(), Error> {
     // rla
     let mut c = Cpu::new();
-    c.fw(Flag::C, true);
+    c.fw(&Flag::C, true);
     c.rw(&R::A, 0b0100_0000);
     c.execute(&c.decode(0x17)?)?;
     assert_eq!(c.rr(&R::A), 0b1000_0001);
 
-    c.fw(Flag::C, false);
+    c.fw(&Flag::C, false);
     c.rw(&R::A, 0b1000_0000);
     c.execute(&c.decode(0x17)?)?;
     assert_eq!(c.rr(&R::A), 0b0000_0000);
@@ -530,12 +571,12 @@ fn test_execute_rla() -> Result<(), Error> {
 fn test_execute_rra() -> Result<(), Error> {
     // rra
     let mut c = Cpu::new();
-    c.fw(Flag::C, true);
+    c.fw(&Flag::C, true);
     c.rw(&R::A, 0b0000_0010);
     c.execute(&c.decode(0x1f)?)?;
     assert_eq!(c.rr(&R::A), 0b1000_0001);
 
-    c.fw(Flag::C, false);
+    c.fw(&Flag::C, false);
     c.rw(&R::A, 0b0000_0001);
     c.execute(&c.decode(0x1f)?)?;
     assert_eq!(c.rr(&R::A), 0b0000_0000);
@@ -546,12 +587,12 @@ fn test_execute_rra() -> Result<(), Error> {
 fn test_execute_djnz() -> Result<(), Error> {
     // djnz *
     let mut c = Cpu::new();
-    c.fw(Flag::Z, true);
+    c.fw(&Flag::Z, false);
     insert_imm8(&mut c, (50 as i8) as u8);
     c.execute(&c.decode(0x10)?)?;
     assert_eq!(c.pc as u16, 50);
 
-    c.fw(Flag::Z, false);
+    c.fw(&Flag::Z, true);
     insert_imm8(&mut c, (-1 as i8) as u8);
     c.execute(&c.decode(0x10)?)?;
     assert_eq!(c.pc as u16, 52);
@@ -571,6 +612,40 @@ fn test_execute_jr() -> Result<(), Error> {
     insert_imm8(&mut c, (-5 as i8) as u8);
     c.execute(&c.decode(0x18)?)?;
     assert_eq!(c.pc, 45);
+
+    // jr nz, *
+    let mut c = Cpu::new();
+    c.fw(&Flag::Z, false);
+    insert_imm8(&mut c, (50 as i8) as u8);
+    c.execute(&c.decode(0x20)?)?;
+    assert_eq!(c.pc, 50);
+    c.fw(&Flag::Z, true);
+    insert_imm8(&mut c, (-5 as i8) as u8);
+    c.execute(&c.decode(0x20)?)?;
+    assert_eq!(c.pc, 52);
+
+    Ok(())
+}
+
+#[test]
+fn test_execute_ex() -> Result<(), Error> {
+    // TODO: shadow registers
+    Ok(())
+}
+
+#[test]
+fn test_execute_daa() -> Result<(), Error> {
+    // TODO: BCD
+    Ok(())
+}
+
+#[test]
+fn test_execute_cpl() -> Result<(), Error> {
+    // cpl
+    let mut c = Cpu::new();
+    c.rw(&R::A, 0b1010_0101);
+    c.execute(&c.decode(0x2f)?)?;
+    assert_eq!(c.rr(&R::A), 0b0101_1010);
 
     Ok(())
 }
