@@ -71,7 +71,7 @@ impl Cpu {
 
     fn write(&mut self, x: usize, v: u8) -> Result<(), Error> {
         match x {
-            0x0000..=0x7fff => Ok(self.rom[x] = v),
+            0x0000..=0x7fff => Ok(()), // write to ROM has no action
             0x8000..=0xffff => Ok(self.ram[x - 0x8000] = v),
             _ => Err(Error::new(ErrorKind::InvalidData, "write outside memory"))
         }

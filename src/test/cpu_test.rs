@@ -29,6 +29,10 @@ fn test_write() {
     c.write(0x8001, 0xef).unwrap();
     assert_eq!(c.ram[0x0000], 0xbe); // NOTE: don't actually read from memory like this,
     assert_eq!(c.ram[0x0001], 0xef); // just an independent test from self.read()
+    c.write(0x0000, 0xde).unwrap();
+    c.write(0x0001, 0xad).unwrap();
+    assert_eq!(c.rom[0x0000], 0x00); // writes to ROM have no affect
+    assert_eq!(c.rom[0x0001], 0x00);
 
     // invalid writes
     let mut c = Cpu::new();
@@ -40,10 +44,10 @@ fn test_write() {
 fn test_fetch() {
     // valid fetch
     let mut c = Cpu::new();
-    c.write(0x0000, 0xde).unwrap();
-    c.write(0x0001, 0xad).unwrap();
-    c.write(0x0002, 0xbe).unwrap();
-    c.write(0x0003, 0xef).unwrap();
+    c.rom[0x0000] = 0xde;
+    c.rom[0x0001] = 0xad;
+    c.rom[0x0002] = 0xbe;
+    c.rom[0x0003] = 0xef;
     assert_eq!(c.fetch().unwrap(), 0xdead);
     assert_eq!(c.pc, 0x0002);
     assert_eq!(c.fetch().unwrap(), 0xbeef);
