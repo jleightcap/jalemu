@@ -451,6 +451,10 @@ fn test_u16_arg() -> Result<(), Error> {
     assert_eq!(v, 0xffee);
     assert_eq!(pc, PC::Im16);
 
+    // op XX, [**] (mismatch length)
+    let e = c.u16_arg(&Arg16::Mem(MemAddr::Imm)).map_err(|e| e.kind());
+    assert_eq!(e, Err(ErrorKind::InvalidData));
+
     Ok(())
 }
 
@@ -484,23 +488,32 @@ fn test_execute_ld8() -> Result<(), Error> {
     c.execute(&c.decode(0x0a)?)?;
     assert_eq!(c.rr(&R::A), 0xfe);
 
+    // ld *, X
+    let mut c = Cpu::new();
+    let e = c.execute(&Instr::LD8(Arg8::U8, Arg8::Reg(R::A))).map_err(|e| e.kind());
+    assert_eq!(e, Err(ErrorKind::InvalidData));
+
     Ok(())
 }
 
 #[test]
 fn test_execute_ld16() -> Result<(), Error> {
-    // ld bc, **
+    // ld SR, **
     let mut c = Cpu::new();
     insert_imm16(&mut c, 0xdead);
     c.execute(&c.decode(0x01)?)?;
     assert_eq!(c.pc, 0x0003);
     assert_eq!(c.srr(&SR::BC), 0xdead);
 
-    // ld de, **
+    // ld **, XX
     let mut c = Cpu::new();
-    insert_imm16(&mut c, 0xbeef);
-    c.execute(&c.decode(0x11)?)?;
-    assert_eq!(c.srr(&SR::DE), 0xbeef);
+    let e = c.execute(&Instr::LD16(Arg16::U16, Arg16::Reg(SR::HL))).map_err(|e| e.kind());
+    assert_eq!(e, Err(ErrorKind::InvalidData));
+
+    // ld [**], XX
+    let mut c = Cpu::new();
+    let e = c.execute(&Instr::LD16(Arg16::Mem(MemAddr::Imm), Arg16::Reg(SR::HL))).map_err(|e| e.kind());
+    assert_eq!(e, Err(ErrorKind::InvalidData));
 
     Ok(())
 }
@@ -513,22 +526,43 @@ fn test_execute_inc8() -> Result<(), Error> {
     c.execute(&c.decode(0x04)?)?;
     assert_eq!(c.rr(&R::B), 0x00);
 
+    // inc *
+    let mut c = Cpu::new();
+    let e = c.execute(&Instr::INC8(Arg8::U8)).map_err(|e| e.kind());
+    assert_eq!(e, Err(ErrorKind::InvalidData));
+
+    // inc [**]
+    let mut c = Cpu::new();
+    let e = c.execute(&Instr::INC8(Arg8::Mem(MemAddr::Imm))).map_err(|e| e.kind());
+    assert_eq!(e, Err(ErrorKind::InvalidData));
+
+    // inc [SR]
+    let mut c = Cpu::new();
+    c.srw(&SR::HL, 0xfefe);
+    c.write(0xfefe, 0xaf)?;
+    c.execute(&c.decode(0x34)?)?;
+    assert_eq!(c.read(0xfefe)?, 0xaf + 1);
+
     Ok(())
 }
 
 #[test]
 fn test_execute_inc16() -> Result<(), Error> {
-    // inc bc
+    // inc SR
     let mut c = Cpu::new();
     c.srw(&SR::BC, 0xffff);
     c.execute(&c.decode(0x03)?)?;
     assert_eq!(c.srr(&SR::BC), 0x0000);
 
-    // inc de
+    // inc **
     let mut c = Cpu::new();
-    c.srw(&SR::DE, 0x010f);
-    c.execute(&c.decode(0x13)?)?;
-    assert_eq!(c.srr(&SR::DE), 0x0110);
+    let e = c.execute(&Instr::INC16(Arg16::U16)).map_err(|e| e.kind());
+    assert_eq!(e, Err(ErrorKind::InvalidData));
+
+    // inc [**]
+    let mut c = Cpu::new();
+    let e = c.execute(&Instr::INC16(Arg16::Mem(MemAddr::Imm))).map_err(|e| e.kind());
+    assert_eq!(e, Err(ErrorKind::InvalidData));
 
     Ok(())
 }
@@ -547,6 +581,16 @@ fn test_execute_add16() -> Result<(), Error> {
     c.execute(&c.decode(0x09)?)?;
     assert_eq!(c.srr(&SR::HL), 0xff);
 
+    // add **, XX
+    let mut c = Cpu::new();
+    let e = c.execute(&Instr::ADD16(Arg16::U16, Arg16::Reg(SR::HL))).map_err(|e| e.kind());
+    assert_eq!(e, Err(ErrorKind::InvalidData));
+
+    // add [**], XX
+    let mut c = Cpu::new();
+    let e = c.execute(&Instr::ADD16(Arg16::Mem(MemAddr::Imm), Arg16::Reg(SR::HL))).map_err(|e| e.kind());
+    assert_eq!(e, Err(ErrorKind::InvalidData));
+
     Ok(())
 }
 
@@ -558,6 +602,23 @@ fn test_execute_dec8() -> Result<(), Error> {
     c.execute(&c.decode(0x05)?)?;
     assert_eq!(c.rr(&R::B), 0xff);
 
+    // dec *
+    let mut c = Cpu::new();
+    let e = c.execute(&Instr::DEC8(Arg8::U8)).map_err(|e| e.kind());
+    assert_eq!(e, Err(ErrorKind::InvalidData));
+
+    // dec [**]
+    let mut c = Cpu::new();
+    let e = c.execute(&Instr::DEC8(Arg8::Mem(MemAddr::Imm))).map_err(|e| e.kind());
+    assert_eq!(e, Err(ErrorKind::InvalidData));
+
+    // dec [SR]
+    let mut c = Cpu::new();
+    c.srw(&SR::HL, 0xfefe);
+    c.write(0xfefe, 0xaf)?;
+    c.execute(&c.decode(0x35)?)?;
+    assert_eq!(c.read(0xfefe)?, 0xaf - 1);
+
     Ok(())
 }
 
@@ -568,6 +629,16 @@ fn test_execute_dec16() -> Result<(), Error> {
     c.srw(&SR::BC, 0x0000);
     c.execute(&c.decode(0x0b)?)?;
     assert_eq!(c.srr(&SR::BC), 0xffff);
+
+    // dec **
+    let mut c = Cpu::new();
+    let e = c.execute(&Instr::DEC16(Arg16::U16)).map_err(|e| e.kind());
+    assert_eq!(e, Err(ErrorKind::InvalidData));
+
+    // dec [**]
+    let mut c = Cpu::new();
+    let e = c.execute(&Instr::DEC16(Arg16::Mem(MemAddr::Imm))).map_err(|e| e.kind());
+    assert_eq!(e, Err(ErrorKind::InvalidData));
 
     Ok(())
 }
@@ -642,10 +713,11 @@ fn test_execute_djnz() -> Result<(), Error> {
     c.execute(&c.decode(0x10)?)?;
     assert_eq!(c.pc as u16, 50);
 
+    let mut c = Cpu::new();
     c.fw(&Flag::Z, true);
     insert_imm8(&mut c, (-1 as i8) as u8);
     c.execute(&c.decode(0x10)?)?;
-    assert_eq!(c.pc as u16, 52);
+    assert_eq!(c.pc as u16, 2);
 
     Ok(())
 }
@@ -663,7 +735,18 @@ fn test_execute_jr() -> Result<(), Error> {
     c.execute(&c.decode(0x18)?)?;
     assert_eq!(c.pc, 45);
 
-    // jr nz, *
+    // jr F, *
+    let mut c = Cpu::new();
+    c.fw(&Flag::Z, true);
+    insert_imm8(&mut c, (50 as i8) as u8);
+    c.execute(&c.decode(0x28)?)?;
+    assert_eq!(c.pc, 50);
+    c.fw(&Flag::Z, false);
+    insert_imm8(&mut c, (-1 as i8) as u8);
+    c.execute(&c.decode(0x28)?)?;
+    assert_eq!(c.pc, 52);
+
+    // jr NF, *
     let mut c = Cpu::new();
     c.fw(&Flag::Z, false);
     insert_imm8(&mut c, (50 as i8) as u8);
@@ -696,6 +779,28 @@ fn test_execute_cpl() -> Result<(), Error> {
     c.rw(&R::A, 0b1010_0101);
     c.execute(&c.decode(0x2f)?)?;
     assert_eq!(c.rr(&R::A), 0b0101_1010);
+
+    Ok(())
+}
+
+#[test]
+fn test_execute_scf() -> Result<(), Error> {
+    // scf
+    let mut c = Cpu::new();
+    assert_eq!(c.fr(&Flag::C), false);
+    c.execute(&c.decode(0x37)?)?;
+    assert_eq!(c.fr(&Flag::C), true);
+
+    Ok(())
+}
+
+#[test]
+fn test_execute_ccf() -> Result<(), Error> {
+    // scf
+    let mut c = Cpu::new();
+    c.fw(&Flag::C, true);
+    c.execute(&c.decode(0x3f)?)?;
+    assert_eq!(c.fr(&Flag::C), false);
 
     Ok(())
 }

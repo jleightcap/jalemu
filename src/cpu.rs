@@ -207,6 +207,7 @@ impl Cpu {
     }
 
     // write to a sandwich register
+    #[cfg(not(tarpaulin_include))]
     fn srw(&mut self, r: &SR, x: u16) {
         match r {
             SR::AF => {
@@ -231,6 +232,7 @@ impl Cpu {
     /* }}} */
 
     /* FLAGS {{{ */
+    #[cfg(not(tarpaulin_include))]
     fn fr(&self, f: &Flag) -> bool {
         fn tob(u: u8) -> bool {
             match u {
@@ -249,6 +251,7 @@ impl Cpu {
         }
     }
 
+    #[cfg(not(tarpaulin_include))]
     fn fw(&mut self, f: &Flag, b: bool) {
         fn bot(b: bool) -> u8 {
             match b {
@@ -590,7 +593,7 @@ impl Cpu {
         match a {
             Arg16::U16      => { Ok((self.imm16()?, PC::Im16)) },
             Arg16::Reg(sr)  => { Ok((self.srr(sr), PC::I)) },
-            Arg16::Mem(_)   => Err(Error::new(ErrorKind::InvalidData, "read from immediate")),
+            Arg16::Mem(_)   => Err(Error::new(ErrorKind::InvalidData, "16-bit arg size mismatch")),
         }
     }
 
@@ -614,7 +617,7 @@ impl Cpu {
             // add **, X
             Arg16::U16      => Err(Error::new(ErrorKind::InvalidData, "add to immediate")),
             // add [**], X
-            Arg16::Mem(_)   => Err(Error::new(ErrorKind::InvalidData, "add from immediate")),
+            Arg16::Mem(_)   => Err(Error::new(ErrorKind::InvalidData, "add to immediate")),
         }
     }
 
@@ -638,12 +641,16 @@ impl Cpu {
             // dec R
             Arg8::Reg(r)    => { self.rw(r, self.rr(r).wrapping_sub(1)); Ok(PC::I) },
             // dec *
-            Arg8::U8        => Err(Error::new(ErrorKind::InvalidData, "sub to constant")),
+            Arg8::U8        => Err(Error::new(ErrorKind::InvalidData, "sub to immediate")),
             Arg8::Mem(addr) => match addr {
                 // dec [**]
-                MemAddr::Imm        => Err(Error::new(ErrorKind::InvalidData, "sub to constant")),
+                MemAddr::Imm        => Err(Error::new(ErrorKind::InvalidData, "sub to immediate")),
                 // dec [SR]
-                MemAddr::Reg(sr)    => { self.srw(sr, self.srr(sr).wrapping_sub(1)); Ok(PC::I) }
+                MemAddr::Reg(sr)    => {
+                    let val = self.read(self.srr(sr) as usize)?;
+                    self.write(self.srr(sr) as usize, val.wrapping_sub(1))?;
+                    Ok(PC::I)
+                }
             }
         }
     }
@@ -681,12 +688,16 @@ impl Cpu {
             // inc R
             Arg8::Reg(r)    => { self.rw(r, self.rr(r).wrapping_add(1)); Ok(PC::I) },
             // inc *
-            Arg8::U8        => Err(Error::new(ErrorKind::InvalidData, "add to constant")),
+            Arg8::U8        => Err(Error::new(ErrorKind::InvalidData, "add to immediate")),
             Arg8::Mem(addr) => match addr {
                 // inc [**]
-                MemAddr::Imm        => Err(Error::new(ErrorKind::InvalidData, "add to constant")),
+                MemAddr::Imm        => Err(Error::new(ErrorKind::InvalidData, "add to immediate")),
                 // inc [SR]
-                MemAddr::Reg(sr)    => { self.srw(sr, self.srr(sr).wrapping_add(1)); Ok(PC::I) }
+                MemAddr::Reg(sr)    => {
+                    let val = self.read(self.srr(sr) as usize)?;
+                    self.write(self.srr(sr) as usize, val.wrapping_add(1))?;
+                    Ok(PC::I)
+                }
             }
         }
     }
@@ -736,7 +747,7 @@ impl Cpu {
             // ld **, X
             Arg16::U16 => Err(Error::new(ErrorKind::InvalidData, "load to immediate")),
             // ld [..], X
-            Arg16::Mem(_)   => Err(Error::new(ErrorKind::InvalidData, "load to immediate")),
+            Arg16::Mem(_)   => Err(Error::new(ErrorKind::InvalidData, "load size mismatch")),
         }
     }
 
