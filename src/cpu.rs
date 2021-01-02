@@ -92,15 +92,19 @@ enum Arg16 {
 
 #[derive(Debug, PartialEq)]
 enum Instr {
-    NOP,
     ADD16   (Arg16, Arg16),
     DEC8    (Arg8),
     DEC16   (Arg16),
+    DJNZ    (Arg8),
     INC8    (Arg8),
     INC16   (Arg16),
+    JR      (Arg8),
     LD8     (Arg8, Arg8),
     LD16    (Arg16, Arg16),
+    NOP,
+    RLA,
     RLCA,
+    RRA,
     RRCA,
 }
 /* }}} */
@@ -346,6 +350,56 @@ impl Cpu {
                         Arg8::U8
                     )),
             0x0f => Ok(Instr::RRCA),
+            0x10 => Ok(Instr::DJNZ(
+                        Arg8::U8
+                    )),
+            0x11 => Ok(Instr::LD16(
+                        Arg16::Reg(SR::DE),
+                        Arg16::U16
+                    )),
+            0x12 => Ok(Instr::LD8(
+                        Arg8::Mem(MemAddr::Reg(SR::DE)),
+                        Arg8::Reg(R::A)
+                    )),
+            0x13 => Ok(Instr::INC16(
+                        Arg16::Reg(SR::DE)
+                    )),
+            0x14 => Ok(Instr::INC8(
+                        Arg8::Reg(R::D)
+                    )),
+            0x15 => Ok(Instr::DEC8(
+                        Arg8::Reg(R::D)
+                    )),
+            0x16 => Ok(Instr::LD8(
+                        Arg8::Reg(R::D),
+                        Arg8::U8
+                    )),
+            0x17 => Ok(Instr::RLA),
+            0x18 => Ok(Instr::JR(
+                        Arg8::U8
+                    )),
+            0x19 => Ok(Instr::ADD16(
+                        Arg16::Reg(SR::HL),
+                        Arg16::Reg(SR::DE)
+                    )),
+            0x1a => Ok(Instr::LD8(
+                        Arg8::Reg(R::A),
+                        Arg8::Mem(MemAddr::Reg(SR::DE))
+                    )),
+            0x1b => Ok(Instr::DEC16(
+                        Arg16::Reg(SR::DE)
+                    )),
+            0x1c => Ok(Instr::INC8(
+                        Arg8::Reg(R::E)
+                    )),
+            0x1d => Ok(Instr::DEC8(
+                        Arg8::Reg(R::E)
+                    )),
+            0x1e => Ok(Instr::LD8(
+                        Arg8::Reg(R::E),
+                        Arg8::U8
+                    )),
+            0x1f => Ok(Instr::RRA),
 
             _ => Err(Error::new(ErrorKind::InvalidData, "unexpected opcode")),
         }
@@ -354,15 +408,19 @@ impl Cpu {
 
     fn execute(&mut self, instr: &Instr) -> Result<(), Error> {
         let pc = match instr {
-            Instr::NOP              => self.nop(),
             Instr::ADD16(a1, a2)    => self.add16(a1, a2),
             Instr::DEC8(a)          => self.dec8(a),
             Instr::DEC16(a)         => self.dec16(a),
+            Instr::DJNZ(a)          => self.djnz(a),
             Instr::INC8(a)          => self.inc8(a),
             Instr::INC16(a)         => self.inc16(a),
+            Instr::JR(a)            => self.jr(a),
             Instr::LD8(a1, a2)      => self.ld8(a1, a2),
             Instr::LD16(a1, a2)     => self.ld16(a1, a2),
+            Instr::NOP              => self.nop(),
+            Instr::RLA              => self.rla(),
             Instr::RLCA             => self.rlca(),
+            Instr::RRA              => self.rra(),
             Instr::RRCA             => self.rrca(),
             _ => Err(Error::new(ErrorKind::InvalidData, "invalid instruction")),
         }?;
@@ -401,10 +459,6 @@ impl Cpu {
         }
     }
 
-    fn nop(&mut self) -> Result<PC, Error> {
-        Ok(PC::I)
-    }
-
     fn add16(&mut self, dst: &Arg16, src: &Arg16) -> Result<PC, Error> {
         let (src, pc) = self.u16_arg(src)?;
         match dst {
@@ -439,6 +493,11 @@ impl Cpu {
         }
     }
 
+    fn djnz(&mut self, dst: &Arg8) -> Result<PC, Error> {
+        // TODO
+        Ok(PC::I)
+    }
+
     fn inc8(&mut self, dst: &Arg8) -> Result<PC, Error> {
         match dst {
             // inc R
@@ -463,6 +522,10 @@ impl Cpu {
         }
     }
 
+    fn jr(&mut self, dst: &Arg8) -> Result<PC, Error> {
+        // TODO
+        Ok(PC::I)
+    }
 
     fn ld8(&mut self, dst: &Arg8, src: &Arg8) -> Result<PC, Error> {
         let (src, pc) = self.u8_arg(src)?;
@@ -490,10 +553,24 @@ impl Cpu {
         }
     }
 
+    fn nop(&mut self) -> Result<PC, Error> {
+        Ok(PC::I)
+    }
+
+    fn rla(&mut self) -> Result<PC, Error> {
+        // TODO
+        Ok(PC::I)
+    }
+
     fn rlca(&mut self) -> Result<PC, Error> {
         let prev = self.rr(&R::A);
         let msb = (prev >> 7) & 0b1;
         self.rw(&R::A, prev << 1 | (msb << 0));
+        Ok(PC::I)
+    }
+
+    fn rra(&mut self) -> Result<PC, Error> {
+        // TODO
         Ok(PC::I)
     }
 
