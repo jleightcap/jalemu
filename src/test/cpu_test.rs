@@ -65,6 +65,8 @@ fn test_sandwich() {
     c.c = 0x04;
     c.d = 0x05;
     c.e = 0x06;
+    c.h = 0x07;
+    c.l = 0x08;
 
     assert_eq!(c.srr(SR::AF), (0x01 << 8) | 0x02);
     c.srw(SR::AF, 0xdead);
@@ -78,6 +80,11 @@ fn test_sandwich() {
 
     assert_eq!(c.srr(SR::DE), (0x05 << 8) | 0x06);
     c.srw(SR::DE, 0xdead);
+    assert_eq!(c.d, 0xde);
+    assert_eq!(c.e, 0xad);
+
+    assert_eq!(c.srr(SR::HL), (0x07 << 8) | 0x08);
+    c.srw(SR::HL, 0xdead);
     assert_eq!(c.d, 0xde);
     assert_eq!(c.e, 0xad);
 }
@@ -154,4 +161,41 @@ fn test_flags() {
     assert_eq!(c.fr(Flag::S), true); // S
     c.fw(Flag::S, false);
     assert_eq!(c.fr(Flag::S), false);
+}
+
+#[test]
+fn test_decode_0x0() {
+    let c = Cpu::new();
+
+    let i = c.decode(0x00).unwrap();
+    assert_eq!(i, Instr::NOP);
+    let i = c.decode(0x01).unwrap();
+    assert_eq!(i, Instr::LD16(Arg16::Reg(SR::BC), Arg16::U16));
+    let i = c.decode(0x02).unwrap();
+    assert_eq!(i, Instr::LD8(Arg8::Mem(MemAddr::Reg(SR::BC)), Arg8::Reg(R::A)));
+    let i = c.decode(0x03).unwrap();
+    assert_eq!(i, Instr::INC16(Arg16::Reg(SR::BC)));
+    let i = c.decode(0x04).unwrap();
+    assert_eq!(i, Instr::INC8(Arg8::Reg(R::B)));
+    let i = c.decode(0x05).unwrap();
+    assert_eq!(i, Instr::DEC8(Arg8::Reg(R::B)));
+    let i = c.decode(0x06).unwrap();
+    assert_eq!(i, Instr::LD8(Arg8::Reg(R::B), Arg8::U8));
+    let i = c.decode(0x07).unwrap();
+    assert_eq!(i, Instr::RLCA);
+    // TODO: ex af, af'
+    let i = c.decode(0x09).unwrap();
+    assert_eq!(i, Instr::ADD16(Arg16::Reg(SR::HL), Arg16::Reg(SR::BC)));
+    let i = c.decode(0x0a).unwrap();
+    assert_eq!(i, Instr::LD8(Arg8::Reg(R::A), Arg8::Mem(MemAddr::Reg(SR::BC))));
+    let i = c.decode(0x0b).unwrap();
+    assert_eq!(i, Instr::DEC16(Arg16::Reg(SR::BC)));
+    let i = c.decode(0x0c).unwrap();
+    assert_eq!(i, Instr::INC8(Arg8::Reg(R::C)));
+    let i = c.decode(0x0d).unwrap();
+    assert_eq!(i, Instr::DEC8(Arg8::Reg(R::C)));
+    let i = c.decode(0x0e).unwrap();
+    assert_eq!(i, Instr::LD8(Arg8::Reg(R::C), Arg8::U8));
+    let i = c.decode(0x0f).unwrap();
+    assert_eq!(i, Instr::RRCA);
 }

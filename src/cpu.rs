@@ -10,6 +10,8 @@ pub struct Cpu {
     c:      u8,
     d:      u8,             // de pair
     e:      u8,
+    h:      u8,
+    l:      u8,
     ix:     u16,
     iy:     u16,
     pc:     usize,          // program counter
@@ -20,23 +22,89 @@ pub struct Cpu {
     rom:    [u8; ROM_SIZE],
 }
 
-// sandwich registers, read/write 2x8-bit registers as 16bit
+// registers
+#[derive(Copy, Clone, Debug, PartialEq)]
+enum R {
+    A, F, B, C, D, E
+}
+// sandwich registers, read/write 2x8-bit registers as 1x16-bit register
+#[derive(Copy, Clone, Debug, PartialEq)]
 enum SR {
-    AF, BC, DE
+    AF, BC, DE, HL
 }
 
 // flags, stored as bits in F register
 enum Flag {
-    C, N, PV, H, Z, S
+    S, Z, /* gap */ H, /* gap */ PV, N, C
 }
 
+// program counter states
 enum PC {
     I,              // increment by PC instruction length
     J(usize),       // jump
 }
 
+/* INSTRUCTIONS {{{ */
+// methods if indexing memory
+#[derive(Debug, PartialEq)]
+enum MemAddr {
+    Imm,            // (**)
+    Reg(SR),        // (HL), (BC), etc.
+}
+
+// opcode argument with 8-bit length, examples:
+// AND R
+//     |
+//     +------ 8-bit register argument
+//
+// LD R, *
+//    |  |
+//    |  +---- u8 immediate argument
+//    +------- 8-bit register argument
+//
+// LD (**), A
+//    |     |
+//    |     +- 8-bit register argument
+//    +------- u16 memory index
+#[derive(Debug, PartialEq)]
+enum Arg8 {
+    U8,
+    Reg(R),
+    Mem(MemAddr),
+}
+
+// opcode argument with 16-bit length, examples:
+// DEC HL
+//     |
+//     +------ 16-bit register argument
+// LD HL, **
+//    |   |
+//    |   +--- u16 immediate argument
+//    +------- 16-bit register argument
+#[derive(Debug, PartialEq)]
+enum Arg16 {
+    U16,
+    Reg(SR),
+}
+
+#[derive(Debug, PartialEq)]
+enum Instr {
+    NOP,
+    ADD16   (Arg16, Arg16),
+    DEC8    (Arg8),
+    DEC16   (Arg16),
+    INC8    (Arg8),
+    INC16   (Arg16),
+    LD8     (Arg8, Arg8),
+    LD16    (Arg16, Arg16),
+    RLCA,
+    RRCA,
+}
+/* }}} */
+
+
 impl Cpu {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Cpu {
             a:      0x00,
             f:      0x00,
@@ -44,6 +112,8 @@ impl Cpu {
             c:      0x00,
             d:      0x00,
             e:      0x00,
+            h:      0x00,
+            l:      0x00,
             ix:     0x0000,
             iy:     0x0000,
             pc:     0x0000,
@@ -61,6 +131,7 @@ impl Cpu {
             SR::AF => ((self.a as u16) << 8) | self.f as u16,
             SR::BC => ((self.b as u16) << 8) | self.c as u16,
             SR::DE => ((self.d as u16) << 8) | self.e as u16,
+            SR::HL => ((self.h as u16) << 8) | self.l as u16,
         }
     }
 
@@ -78,6 +149,10 @@ impl Cpu {
             SR::DE => {
                 self.d = ((x & 0xff00) >> 8) as u8;
                 self.e = ((x & 0x00ff) >> 0) as u8;
+            },
+            SR::HL => {
+                self.h = ((x & 0xff00) >> 8) as u8;
+                self.l = ((x & 0x00ff) >> 0) as u8;
             },
         }
     }
@@ -166,6 +241,8 @@ impl Cpu {
         self.c      = 0x00;
         self.d      = 0x00;
         self.e      = 0x00;
+        self.h      = 0x00;
+        self.l      = 0x00;
         self.ix     = 0x0000;
         self.iy     = 0x0000;
         self.pc     = 0x0000;
@@ -179,9 +256,57 @@ impl Cpu {
         self.read(self.pc)
     }
 
-    fn decode(&self) -> Result<PC, Error> {
-        let instr = self.fetch()?;
-        Ok(PC::I)
+    fn decode(&self, instr: u8) -> Result<Instr, Error> {
+        match instr {
+            0x00 => Ok(Instr::NOP),
+            0x01 => Ok(Instr::LD16(
+                        Arg16::Reg(SR::BC),
+                        Arg16::U16
+                    )),
+            0x02 => Ok(Instr::LD8(
+                        Arg8::Mem(MemAddr::Reg(SR::BC)),
+                        Arg8::Reg(R::A)
+                    )),
+            0x03 => Ok(Instr::INC16(
+                        Arg16::Reg(SR::BC)
+                    )),
+            0x04 => Ok(Instr::INC8(
+                        Arg8::Reg(R::B)
+                    )),
+            0x05 => Ok(Instr::DEC8(
+                        Arg8::Reg(R::B)
+                    )),
+            0x06 => Ok(Instr::LD8(
+                        Arg8::Reg(R::B),
+                        Arg8::U8
+                    )),
+            0x07 => Ok(Instr::RLCA),
+            0x08 => panic!("TODO: ex af, af'"),
+            0x09 => Ok(Instr::ADD16(
+                        Arg16::Reg(SR::HL),
+                        Arg16::Reg(SR::BC)
+                    )),
+            0x0a => Ok(Instr::LD8(
+                        Arg8::Reg(R::A),
+                        Arg8::Mem(MemAddr::Reg(SR::BC))
+                    )),
+            0x0b => Ok(Instr::DEC16(
+                        Arg16::Reg(SR::BC)
+                    )),
+            0x0c => Ok(Instr::INC8(
+                        Arg8::Reg(R::C)
+                    )),
+            0x0d => Ok(Instr::DEC8(
+                        Arg8::Reg(R::C)
+                    )),
+            0x0e => Ok(Instr::LD8(
+                        Arg8::Reg(R::C),
+                        Arg8::U8
+                    )),
+            0x0f => Ok(Instr::RRCA),
+
+            _ => Err(Error::new(ErrorKind::InvalidData, "unexpected opcode")),
+        }
     }
 }
 
