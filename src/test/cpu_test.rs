@@ -133,14 +133,15 @@ fn test_register() {
 
     // sandwich registers
     let mut c = Cpu::new();
-    c.a = 0x01;
-    c.f = 0x02;
-    c.b = 0x03;
-    c.c = 0x04;
-    c.d = 0x05;
-    c.e = 0x06;
-    c.h = 0x07;
-    c.l = 0x08;
+    c.a  = 0x01;
+    c.f  = 0x02;
+    c.b  = 0x03;
+    c.c  = 0x04;
+    c.d  = 0x05;
+    c.e  = 0x06;
+    c.h  = 0x07;
+    c.l  = 0x08;
+    c.sp = 0xfafa;
 
     assert_eq!(c.srr(&SR::AF), (0x01 << 8) | 0x02);
     c.srw(&SR::AF, 0xdead);
@@ -161,6 +162,10 @@ fn test_register() {
     c.srw(&SR::HL, 0xdead);
     assert_eq!(c.d, 0xde);
     assert_eq!(c.e, 0xad);
+
+    assert_eq!(c.srr(&SR::SP), 0xfafa);
+    c.srw(&SR::SP, 0xafaf);
+    assert_eq!(c.sp, 0xafaf);
 }
 
 #[test]
@@ -358,6 +363,46 @@ fn test_decode_0x2() -> Result<(), Error> {
 }
 
 #[test]
+fn test_decode_0x3() -> Result<(), Error> {
+    let c = Cpu::new();
+
+    let i = c.decode(0x30)?;
+    assert_eq!(i, Instr::JR(ArgF::NF(Flag::C), Arg8::U8));
+    let i = c.decode(0x31)?;
+    assert_eq!(i, Instr::LD16(Arg16::Reg(SR::SP), Arg16::U16));
+    let i = c.decode(0x32)?;
+    assert_eq!(i, Instr::LD8(Arg8::Mem(MemAddr::Imm), Arg8::Reg(R::A)));
+    let i = c.decode(0x33)?;
+    assert_eq!(i, Instr::INC16(Arg16::Reg(SR::SP)));
+    let i = c.decode(0x34)?;
+    assert_eq!(i, Instr::INC8(Arg8::Mem(MemAddr::Reg(SR::HL))));
+    let i = c.decode(0x35)?;
+    assert_eq!(i, Instr::DEC8(Arg8::Mem(MemAddr::Reg(SR::HL))));
+    let i = c.decode(0x36)?;
+    assert_eq!(i, Instr::LD8(Arg8::Mem(MemAddr::Reg(SR::HL)), Arg8::U8));
+    let i = c.decode(0x37)?;
+    assert_eq!(i, Instr::SCF);
+    let i = c.decode(0x38)?;
+    assert_eq!(i, Instr::JR(ArgF::F(Flag::C), Arg8::U8));
+    let i = c.decode(0x39)?;
+    assert_eq!(i, Instr::ADD16(Arg16::Reg(SR::HL), Arg16::Reg(SR::SP)));
+    let i = c.decode(0x3a)?;
+    assert_eq!(i, Instr::LD8(Arg8::Reg(R::A), Arg8::Mem(MemAddr::Imm)));
+    let i = c.decode(0x3b)?;
+    assert_eq!(i, Instr::DEC16(Arg16::Reg(SR::SP)));
+    let i = c.decode(0x3c)?;
+    assert_eq!(i, Instr::INC8(Arg8::Reg(R::A)));
+    let i = c.decode(0x3d)?;
+    assert_eq!(i, Instr::DEC8(Arg8::Reg(R::A)));
+    let i = c.decode(0x3e)?;
+    assert_eq!(i, Instr::LD8(Arg8::Reg(R::A), Arg8::U8));
+    let i = c.decode(0x3f)?;
+    assert_eq!(i, Instr::CCF);
+
+    Ok(())
+}
+
+#[test]
 fn test_u8_arg() -> Result<(), Error> {
     let mut c = Cpu::new();
 
@@ -485,6 +530,11 @@ fn test_execute_inc16() -> Result<(), Error> {
     c.execute(&c.decode(0x13)?)?;
     assert_eq!(c.srr(&SR::DE), 0x0110);
 
+    Ok(())
+}
+
+#[test]
+fn test_execute_add8() -> Result<(), Error> {
     Ok(())
 }
 

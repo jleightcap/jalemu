@@ -30,7 +30,7 @@ enum R {
 // sandwich registers, read/write 2x8-bit registers as 1x16-bit register
 #[derive(Copy, Clone, Debug, PartialEq)]
 enum SR {
-    AF, BC, DE, HL
+    AF, BC, DE, HL, SP
 }
 
 // flags, stored as bits in F register
@@ -104,7 +104,9 @@ enum ArgF {
 
 #[derive(Debug, PartialEq)]
 enum Instr {
+    ADD8    (Arg8, Arg8),
     ADD16   (Arg16, Arg16),
+    CCF,
     CPL,
     DAA,
     DEC8    (Arg8),
@@ -121,6 +123,7 @@ enum Instr {
     RLCA,
     RRA,
     RRCA,
+    SCF,
 }
 /* }}} */
 
@@ -199,6 +202,7 @@ impl Cpu {
             SR::BC => ((self.b as u16) << 8) | self.c as u16,
             SR::DE => ((self.d as u16) << 8) | self.e as u16,
             SR::HL => ((self.h as u16) << 8) | self.l as u16,
+            SR::SP => self.sp,
         }
     }
 
@@ -221,6 +225,7 @@ impl Cpu {
                 self.h = ((x & 0xff00) >> 8) as u8;
                 self.l = ((x & 0x00ff) >> 0) as u8;
             },
+            SR::SP => { self.sp = x; }
         }
     }
     /* }}} */
@@ -471,6 +476,58 @@ impl Cpu {
                         Arg8::U8
                     )),
             0x2f => Ok(Instr::CPL),
+            0x30 => Ok(Instr::JR(
+                        ArgF::NF(Flag::C),
+                        Arg8::U8
+                    )),
+            0x31 => Ok(Instr::LD16(
+                        Arg16::Reg(SR::SP),
+                        Arg16::U16
+                    )),
+            0x32 => Ok(Instr::LD8(
+                        Arg8::Mem(MemAddr::Imm),
+                        Arg8::Reg(R::A)
+                    )),
+            0x33 => Ok(Instr::INC16(
+                        Arg16::Reg(SR::SP)
+                    )),
+            0x34 => Ok(Instr::INC8(
+                        Arg8::Mem(MemAddr::Reg(SR::HL))
+                    )),
+            0x35 => Ok(Instr::DEC8(
+                        Arg8::Mem(MemAddr::Reg(SR::HL))
+                    )),
+            0x36 => Ok(Instr::LD8(
+                        Arg8::Mem(MemAddr::Reg(SR::HL)),
+                        Arg8::U8
+                    )),
+            0x37 => Ok(Instr::SCF),
+            0x38 => Ok(Instr::JR(
+                        ArgF::F(Flag::C),
+                        Arg8::U8
+                    )),
+            0x39 => Ok(Instr::ADD16(
+                        Arg16::Reg(SR::HL),
+                        Arg16::Reg(SR::SP)
+                    )),
+            0x3a => Ok(Instr::LD8(
+                        Arg8::Reg(R::A),
+                        Arg8::Mem(MemAddr::Imm)
+                    )),
+            0x3b => Ok(Instr::DEC16(
+                        Arg16::Reg(SR::SP)
+                    )),
+            0x3c => Ok(Instr::INC8(
+                        Arg8::Reg(R::A)
+                    )),
+            0x3d => Ok(Instr::DEC8(
+                        Arg8::Reg(R::A)
+                    )),
+            0x3e => Ok(Instr::LD8(
+                        Arg8::Reg(R::A),
+                        Arg8::U8
+                    )),
+            0x3f => Ok(Instr::CCF),
 
             _ => Err(Error::new(ErrorKind::InvalidData, "unexpected opcode")),
         }
@@ -479,7 +536,9 @@ impl Cpu {
 
     fn execute(&mut self, instr: &Instr) -> Result<(), Error> {
         let pc = match instr {
+            Instr::ADD8(a1, a2)     => self.add8(a1, a2),
             Instr::ADD16(a1, a2)    => self.add16(a1, a2),
+            Instr::CCF              => self.ccf(),
             Instr::CPL              => self.cpl(),
             Instr::DAA              => self.daa(),
             Instr::DEC8(a)          => self.dec8(a),
@@ -496,6 +555,7 @@ impl Cpu {
             Instr::RLCA             => self.rlca(),
             Instr::RRA              => self.rra(),
             Instr::RRCA             => self.rrca(),
+            Instr::SCF              => self.scf(),
         }?;
 
         Ok(match pc {
@@ -534,16 +594,33 @@ impl Cpu {
         }
     }
 
+    fn add8(&mut self, dst: &Arg8, src: &Arg8) -> Result<PC, Error> {
+        let (src, pc) = self.u8_arg(src)?;
+        match dst {
+            // add R, X
+            Arg8::Reg(r)    => { self.rw(r, self.rr(r).wrapping_add(src)); Ok(pc) }
+            // add *, X
+            Arg8::U8        => Err(Error::new(ErrorKind::InvalidData, "add to immediate")),
+            // add [**], X
+            Arg8::Mem(_)    => Err(Error::new(ErrorKind::InvalidData, "add to immediate")),
+        }
+    }
+
     fn add16(&mut self, dst: &Arg16, src: &Arg16) -> Result<PC, Error> {
         let (src, pc) = self.u16_arg(src)?;
         match dst {
             // add SR, X
             Arg16::Reg(sr)  => { self.srw(sr, self.srr(sr).wrapping_add(src)); Ok(pc) }
             // add **, X
-            Arg16::U16 => Err(Error::new(ErrorKind::InvalidData, "add to immediate")),
+            Arg16::U16      => Err(Error::new(ErrorKind::InvalidData, "add to immediate")),
             // add [**], X
             Arg16::Mem(_)   => Err(Error::new(ErrorKind::InvalidData, "add from immediate")),
         }
+    }
+
+    fn ccf(&mut self) -> Result<PC, Error> {
+        self.fw(&Flag::C, false);
+        Ok(PC::I)
     }
 
     fn cpl(&mut self) -> Result<PC, Error> {
@@ -710,6 +787,11 @@ impl Cpu {
         let prev = self.rr(&R::A);
         let lsb = (prev >> 0) & 0b1;
         self.rw(&R::A, prev >> 1 | (lsb << 7));
+        Ok(PC::I)
+    }
+
+    fn scf(&mut self) -> Result<PC, Error> {
+        self.fw(&Flag::C, true);
         Ok(PC::I)
     }
     /* }}} */
