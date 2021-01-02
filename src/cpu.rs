@@ -605,6 +605,72 @@ impl Cpu {
                         Arg8::Reg(R::A)
                     )),
             /* }}} */
+            /* 0x5X {{{ */
+            0x50 => Ok(Instr::LD8(
+                        Arg8::Reg(R::D),
+                        Arg8::Reg(R::B)
+                    )),
+            0x51 => Ok(Instr::LD8(
+                        Arg8::Reg(R::D),
+                        Arg8::Reg(R::C)
+                    )),
+            0x52 => Ok(Instr::LD8(
+                        Arg8::Reg(R::D),
+                        Arg8::Reg(R::D)
+                    )),
+            0x53 => Ok(Instr::LD8(
+                        Arg8::Reg(R::D),
+                        Arg8::Reg(R::E)
+                    )),
+            0x54 => Ok(Instr::LD8(
+                        Arg8::Reg(R::D),
+                        Arg8::Reg(R::H)
+                    )),
+            0x55 => Ok(Instr::LD8(
+                        Arg8::Reg(R::D),
+                        Arg8::Reg(R::L)
+                    )),
+            0x56 => Ok(Instr::LD8(
+                        Arg8::Reg(R::D),
+                        Arg8::Mem(MemAddr::Reg(SR::HL))
+                    )),
+            0x57 => Ok(Instr::LD8(
+                        Arg8::Reg(R::D),
+                        Arg8::Reg(R::A)
+                    )),
+            0x58 => Ok(Instr::LD8(
+                        Arg8::Reg(R::E),
+                        Arg8::Reg(R::B)
+                    )),
+            0x59 => Ok(Instr::LD8(
+                        Arg8::Reg(R::E),
+                        Arg8::Reg(R::C)
+                    )),
+            0x5a => Ok(Instr::LD8(
+                        Arg8::Reg(R::E),
+                        Arg8::Reg(R::D)
+                    )),
+            0x5b => Ok(Instr::LD8(
+                        Arg8::Reg(R::E),
+                        Arg8::Reg(R::E)
+                    )),
+            0x5c => Ok(Instr::LD8(
+                        Arg8::Reg(R::E),
+                        Arg8::Reg(R::H)
+                    )),
+            0x5d => Ok(Instr::LD8(
+                        Arg8::Reg(R::E),
+                        Arg8::Reg(R::L)
+                    )),
+            0x5e => Ok(Instr::LD8(
+                        Arg8::Reg(R::E),
+                        Arg8::Mem(MemAddr::Reg(SR::HL))
+                    )),
+            0x5f => Ok(Instr::LD8(
+                        Arg8::Reg(R::E),
+                        Arg8::Reg(R::A)
+                    )),
+            /* }}} */
             _ => Err(Error::new(ErrorKind::InvalidData, "unexpected opcode")),
         }
     }
