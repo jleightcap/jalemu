@@ -86,6 +86,22 @@ impl Cpu {
         }
     }
 
+    fn reset(&mut self) {
+        self.a      = 0x00;
+        self.f      = 0x00;
+        self.b      = 0x00;
+        self.c      = 0x00;
+        self.d      = 0x00;
+        self.e      = 0x00;
+        self.ix     = 0x0000;
+        self.iy     = 0x0000;
+        self.pc     = 0x0000;
+        self.sp     = 0x0000;
+
+        self.ram    = [0x00; RAM_SIZE];
+        //self.rom    = [0x00; ROM_SIZE];
+    }
+
     fn fetch(&mut self) -> Result<u16, Error> {
         let hi = self.read(self.pc    )? as u16;
         let lo = self.read(self.pc + 1)? as u16;

@@ -80,3 +80,33 @@ fn test_sandwich() {
     assert_eq!(c.d, 0xde);
     assert_eq!(c.e, 0xad);
 }
+
+#[test]
+fn test_reset() {
+    let mut c = Cpu::new();
+    c.a = 0xda;
+    c.f = 0xad;
+    c.b = 0xbe;
+    c.c = 0xef;
+    c.d = 0xde;
+    c.e = 0xed;
+    c.ix = 0xdead;
+    c.iy = 0xbeef;
+    c.pc = 0x7fff;
+    c.sp = 0x8f8f;
+    c.ram[0x7f7f] = 0x7f;
+
+    c.reset();
+
+    assert_eq!(c.a, 0x00);
+    assert_eq!(c.f, 0x00);
+    assert_eq!(c.b, 0x00);
+    assert_eq!(c.c, 0x00);
+    assert_eq!(c.d, 0x00);
+    assert_eq!(c.e, 0x00);
+    assert_eq!(c.ix, 0x0000);
+    assert_eq!(c.iy, 0x0000);
+    assert_eq!(c.pc, 0x0000);
+    assert_eq!(c.sp, 0x0000);
+    assert_eq!(&c.ram[..], [0; RAM_SIZE]);
+}
