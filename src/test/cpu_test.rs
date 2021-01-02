@@ -1,36 +1,47 @@
 use super::*;
 
+fn insert_imm8(c: &mut Cpu, imm8: u8) {
+    c.rom[c.pc + 1] = imm8
+}
+
+fn insert_imm16(c: &mut Cpu, imm16: u16) {
+    c.rom[c.pc + 1] = ((imm16 & 0xff00) >> 8) as u8;
+    c.rom[c.pc + 2] = ((imm16 & 0x00ff) >> 0) as u8;
+}
+
 #[test]
-fn test_read() {
+fn test_read() -> Result<(), Error> {
     // valid reads
     let mut c = Cpu::new();
     c.rom[0x0000] = 0xde; // NOTE: don't actually write to memory like this,
     c.rom[0x0001] = 0xad; // just an independent test from self.write()
-    assert_eq!(c.read(0x0000).unwrap(), 0xde);
-    assert_eq!(c.read(0x0001).unwrap(), 0xad);
+    assert_eq!(c.read(0x0000)?, 0xde);
+    assert_eq!(c.read(0x0001)?, 0xad);
     c.ram[0x0000] = 0xbe; // similarly, ram shouldn't be written like this
     c.ram[0x0001] = 0xef; // ram[0x0000] mapped to 0x8000
     c.ram[0x7fff] = 0xff;
-    assert_eq!(c.read(0x8000).unwrap(), 0xbe);
-    assert_eq!(c.read(0x8001).unwrap(), 0xef);
-    assert_eq!(c.read(0xffff).unwrap(), 0xff);
+    assert_eq!(c.read(0x8000)?, 0xbe);
+    assert_eq!(c.read(0x8001)?, 0xef);
+    assert_eq!(c.read(0xffff)?, 0xff);
 
     // invalid reads
     let c = Cpu::new();
     let e = c.read(0x10000).map_err(|e| e.kind());
     assert_eq!(e, Err(ErrorKind::InvalidData));
+
+    Ok(())
 }
 
 #[test]
-fn test_write() {
+fn test_write() -> Result<(), Error> {
     // valid writes
     let mut c = Cpu::new();
-    c.write(0x8000, 0xbe).unwrap();
-    c.write(0x8001, 0xef).unwrap();
+    c.write(0x8000, 0xbe)?;
+    c.write(0x8001, 0xef)?;
     assert_eq!(c.ram[0x0000], 0xbe); // NOTE: don't actually read from memory like this,
     assert_eq!(c.ram[0x0001], 0xef); // just an independent test from self.read()
-    c.write(0x0000, 0xde).unwrap();
-    c.write(0x0001, 0xad).unwrap();
+    c.write(0x0000, 0xde)?;
+    c.write(0x0001, 0xad)?;
     assert_eq!(c.rom[0x0000], 0x00); // writes to ROM have no affect
     assert_eq!(c.rom[0x0001], 0x00);
 
@@ -38,26 +49,46 @@ fn test_write() {
     let mut c = Cpu::new();
     let e = c.write(0x10000, 0xff).map_err(|e| e.kind());
     assert_eq!(e, Err(ErrorKind::InvalidData));
+
+    Ok(())
 }
 
 #[test]
-fn test_fetch() {
+fn test_insert_imm8() {
+    let mut c = Cpu::new();
+    insert_imm8(&mut c, 0xfe);
+    assert_eq!(c.rom[0x0001], 0xfe);
+}
+
+#[test]
+fn test_insert_imm16() {
+    let mut c = Cpu::new();
+    insert_imm16(&mut c, 0xbeef);
+    assert_eq!(c.rom[0x0001], 0xbe);
+    assert_eq!(c.rom[0x0002], 0xef);
+}
+
+#[test]
+fn test_fetch() -> Result<(), Error> {
     // valid fetch
     let mut c = Cpu::new();
     c.rom[0x0000] = 0xde;
     c.rom[0x0001] = 0xad;
-    assert_eq!(c.fetch().unwrap(), 0xde);
+    assert_eq!(c.fetch()?, 0xde);
     c.pc += 1;
-    assert_eq!(c.fetch().unwrap(), 0xad);
+    assert_eq!(c.fetch()?, 0xad);
 
     // invalid fetch
     c.pc = 0x10000;
     let e = c.fetch().map_err(|e| e.kind());
     assert_eq!(e, Err(ErrorKind::InvalidData));
+
+    Ok(())
 }
 
 #[test]
-fn test_sandwich() {
+fn test_register() {
+    // normal registers
     let mut c = Cpu::new();
     c.a = 0x01;
     c.f = 0x02;
@@ -68,23 +99,66 @@ fn test_sandwich() {
     c.h = 0x07;
     c.l = 0x08;
 
-    assert_eq!(c.srr(SR::AF), (0x01 << 8) | 0x02);
-    c.srw(SR::AF, 0xdead);
+    assert_eq!(c.rr(&R::A), 0x01);
+    c.rw(&R::A, 0x10);
+    assert_eq!(c.a, 0x10);
+
+    assert_eq!(c.rr(&R::F), 0x02);
+    c.rw(&R::F, 0x20);
+    assert_eq!(c.f, 0x20);
+
+    assert_eq!(c.rr(&R::B), 0x03);
+    c.rw(&R::B, 0x30);
+    assert_eq!(c.b, 0x30);
+
+    assert_eq!(c.rr(&R::C), 0x04);
+    c.rw(&R::C, 0x40);
+    assert_eq!(c.c, 0x40);
+
+    assert_eq!(c.rr(&R::D), 0x05);
+    c.rw(&R::D, 0x50);
+    assert_eq!(c.d, 0x50);
+
+    assert_eq!(c.rr(&R::E), 0x06);
+    c.rw(&R::E, 0x60);
+    assert_eq!(c.e, 0x60);
+
+    assert_eq!(c.rr(&R::H), 0x07);
+    c.rw(&R::H, 0x70);
+    assert_eq!(c.h, 0x70);
+
+    assert_eq!(c.rr(&R::L), 0x08);
+    c.rw(&R::L, 0x80);
+    assert_eq!(c.l, 0x80);
+
+    // sandwich registers
+    let mut c = Cpu::new();
+    c.a = 0x01;
+    c.f = 0x02;
+    c.b = 0x03;
+    c.c = 0x04;
+    c.d = 0x05;
+    c.e = 0x06;
+    c.h = 0x07;
+    c.l = 0x08;
+
+    assert_eq!(c.srr(&SR::AF), (0x01 << 8) | 0x02);
+    c.srw(&SR::AF, 0xdead);
     assert_eq!(c.a, 0xde);
     assert_eq!(c.f, 0xad);
 
-    assert_eq!(c.srr(SR::BC), (0x03 << 8) | 0x04);
-    c.srw(SR::BC, 0xdead);
+    assert_eq!(c.srr(&SR::BC), (0x03 << 8) | 0x04);
+    c.srw(&SR::BC, 0xdead);
     assert_eq!(c.b, 0xde);
     assert_eq!(c.c, 0xad);
 
-    assert_eq!(c.srr(SR::DE), (0x05 << 8) | 0x06);
-    c.srw(SR::DE, 0xdead);
+    assert_eq!(c.srr(&SR::DE), (0x05 << 8) | 0x06);
+    c.srw(&SR::DE, 0xdead);
     assert_eq!(c.d, 0xde);
     assert_eq!(c.e, 0xad);
 
-    assert_eq!(c.srr(SR::HL), (0x07 << 8) | 0x08);
-    c.srw(SR::HL, 0xdead);
+    assert_eq!(c.srr(&SR::HL), (0x07 << 8) | 0x08);
+    c.srw(&SR::HL, 0xdead);
     assert_eq!(c.d, 0xde);
     assert_eq!(c.e, 0xad);
 }
@@ -164,38 +238,238 @@ fn test_flags() {
 }
 
 #[test]
-fn test_decode_0x0() {
+fn test_decode_0x0() -> Result<(), Error> {
     let c = Cpu::new();
 
-    let i = c.decode(0x00).unwrap();
+    let i = c.decode(0x00)?;
     assert_eq!(i, Instr::NOP);
-    let i = c.decode(0x01).unwrap();
+    let i = c.decode(0x01)?;
     assert_eq!(i, Instr::LD16(Arg16::Reg(SR::BC), Arg16::U16));
-    let i = c.decode(0x02).unwrap();
+    let i = c.decode(0x02)?;
     assert_eq!(i, Instr::LD8(Arg8::Mem(MemAddr::Reg(SR::BC)), Arg8::Reg(R::A)));
-    let i = c.decode(0x03).unwrap();
+    let i = c.decode(0x03)?;
     assert_eq!(i, Instr::INC16(Arg16::Reg(SR::BC)));
-    let i = c.decode(0x04).unwrap();
+    let i = c.decode(0x04)?;
     assert_eq!(i, Instr::INC8(Arg8::Reg(R::B)));
-    let i = c.decode(0x05).unwrap();
+    let i = c.decode(0x05)?;
     assert_eq!(i, Instr::DEC8(Arg8::Reg(R::B)));
-    let i = c.decode(0x06).unwrap();
+    let i = c.decode(0x06)?;
     assert_eq!(i, Instr::LD8(Arg8::Reg(R::B), Arg8::U8));
-    let i = c.decode(0x07).unwrap();
+    let i = c.decode(0x07)?;
     assert_eq!(i, Instr::RLCA);
     // TODO: ex af, af'
-    let i = c.decode(0x09).unwrap();
+    let i = c.decode(0x09)?;
     assert_eq!(i, Instr::ADD16(Arg16::Reg(SR::HL), Arg16::Reg(SR::BC)));
-    let i = c.decode(0x0a).unwrap();
+    let i = c.decode(0x0a)?;
     assert_eq!(i, Instr::LD8(Arg8::Reg(R::A), Arg8::Mem(MemAddr::Reg(SR::BC))));
-    let i = c.decode(0x0b).unwrap();
+    let i = c.decode(0x0b)?;
     assert_eq!(i, Instr::DEC16(Arg16::Reg(SR::BC)));
-    let i = c.decode(0x0c).unwrap();
+    let i = c.decode(0x0c)?;
     assert_eq!(i, Instr::INC8(Arg8::Reg(R::C)));
-    let i = c.decode(0x0d).unwrap();
+    let i = c.decode(0x0d)?;
     assert_eq!(i, Instr::DEC8(Arg8::Reg(R::C)));
-    let i = c.decode(0x0e).unwrap();
+    let i = c.decode(0x0e)?;
     assert_eq!(i, Instr::LD8(Arg8::Reg(R::C), Arg8::U8));
-    let i = c.decode(0x0f).unwrap();
+    let i = c.decode(0x0f)?;
     assert_eq!(i, Instr::RRCA);
+    
+    Ok(())
+}
+
+#[test]
+fn test_u8_arg() -> Result<(), Error> {
+    let mut c = Cpu::new();
+
+    // op X, R
+    c.rw(&R::A, 0xfe);
+    let (v, pc) = c.u8_arg(&Arg8::Reg(R::A))?;
+    assert_eq!(v, 0xfe);
+    assert_eq!(pc, PC::I);
+
+    // op X, *
+    insert_imm8(&mut c, 0xef);
+    let (v, pc) = c.u8_arg(&Arg8::U8)?;
+    assert_eq!(v, 0xef);
+    assert_eq!(pc, PC::Im8);
+
+    // op X, (**)
+    insert_imm16(&mut c, 0xfeed);
+    c.write(0xfeed, 0xaf)?;
+    let (v, pc) = c.u8_arg(&Arg8::Mem(MemAddr::Imm))?;
+    assert_eq!(v, 0xaf);
+    assert_eq!(pc, PC::Im16);
+
+    // op X, (SR)
+    c.srw(&SR::HL, 0xdeef);
+    c.write(0xdeef, 0xfa)?;
+    let (v, pc) = c.u8_arg(&Arg8::Mem(MemAddr::Reg(SR::HL)))?;
+    assert_eq!(v, 0xfa);
+    assert_eq!(pc, PC::I);
+
+    Ok(())
+}
+
+#[test]
+fn test_u16_arg() -> Result<(), Error> {
+    let mut c = Cpu::new();
+
+    // op XX, HL
+    c.srw(&SR::HL, 0xfeed);
+    let (v, pc) = c.u16_arg(&Arg16::Reg(SR::HL))?;
+    assert_eq!(v, 0xfeed);
+    assert_eq!(pc, PC::I);
+
+    // op XX, **
+    insert_imm16(&mut c, 0xffee);
+    let (v, pc) = c.u16_arg(&Arg16::U16)?;
+    assert_eq!(v, 0xffee);
+    assert_eq!(pc, PC::Im16);
+
+    Ok(())
+}
+
+#[test]
+fn test_execute_nop() -> Result<(), Error> {
+    let mut c = Cpu::new();
+    c.execute(&c.decode(0x00)?)?;
+    Ok(())
+}
+
+#[test]
+fn test_execute_ld8() -> Result<(), Error> {
+    // ld (bc), a
+    let mut c = Cpu::new();
+    c.rw(&R::A, 0xfe);
+    c.srw(&SR::BC, 0xff00);
+    c.execute(&c.decode(0x02)?)?;
+    assert_eq!(c.read(0xff00)?, 0xfe);
+
+    // ld b, *
+    let mut c = Cpu::new();
+    insert_imm8(&mut c, 0xfe);
+    c.execute(&c.decode(0x06)?)?;
+    assert_eq!(c.rr(&R::B), 0xfe);
+
+    // ld a, (bc)
+    let mut c = Cpu::new();
+    c.srw(&SR::BC, 0xff00);
+    c.write(0xff00, 0xfe)?;
+    c.execute(&c.decode(0x0a)?)?;
+    assert_eq!(c.rr(&R::A), 0xfe);
+
+    // ld c, *
+    let mut c = Cpu::new();
+    insert_imm8(&mut c, 0xfe);
+    c.execute(&c.decode(0x0e)?)?;
+    assert_eq!(c.rr(&R::C), 0xfe);
+
+    Ok(())
+}
+
+#[test]
+fn test_execute_ld16() -> Result<(), Error> {
+    // ld bc, **
+    let mut c = Cpu::new();
+    insert_imm16(&mut c, 0xdead);
+    c.execute(&c.decode(0x01)?)?;
+    assert_eq!(c.pc, 0x0003);
+    assert_eq!(c.srr(&SR::BC), 0xdead);
+
+    Ok(())
+}
+
+#[test]
+fn test_execute_inc8() -> Result<(), Error> {
+    // inc b
+    let mut c = Cpu::new();
+    c.rw(&R::B, 0xff);
+    c.execute(&c.decode(0x04)?)?;
+    assert_eq!(c.rr(&R::B), 0x00);
+
+    // inc c
+    let mut c = Cpu::new();
+    c.rw(&R::C, 0x00);
+    c.execute(&c.decode(0x0c)?)?;
+    assert_eq!(c.rr(&R::C), 0x01);
+
+    Ok(())
+}
+
+#[test]
+fn test_execute_inc16() -> Result<(), Error> {
+    // inc bc
+    let mut c = Cpu::new();
+    c.srw(&SR::BC, 0xffff);
+    c.execute(&c.decode(0x03)?)?;
+    assert_eq!(c.srr(&SR::BC), 0x0000);
+
+    Ok(())
+}
+
+#[test]
+fn test_execute_add16() -> Result<(), Error> {
+    // add hl, bc
+    let mut c = Cpu::new();
+    c.srw(&SR::BC, 0x0f);
+    c.srw(&SR::HL, 0xf0);
+    c.execute(&c.decode(0x09)?)?;
+    assert_eq!(c.srr(&SR::HL), 0xff);
+
+    Ok(())
+}
+
+#[test]
+fn test_execute_dec8() -> Result<(), Error> {
+    // dec b
+    let mut c = Cpu::new();
+    c.rw(&R::B, 0x00);
+    c.execute(&c.decode(0x05)?)?;
+    assert_eq!(c.rr(&R::B), 0xff);
+
+    // dec c
+    let mut c = Cpu::new();
+    c.rw(&R::C, 0x01);
+    c.execute(&c.decode(0x0d)?)?;
+    assert_eq!(c.rr(&R::C), 0x00);
+
+    Ok(())
+}
+
+#[test]
+fn test_execute_dec16() -> Result<(), Error> {
+    // dec bc
+    let mut c = Cpu::new();
+    c.srw(&SR::BC, 0x0000);
+    c.execute(&c.decode(0x0b)?)?;
+    assert_eq!(c.srr(&SR::BC), 0xffff);
+
+    Ok(())
+}
+
+#[test]
+fn test_execute_rlca() -> Result<(), Error> {
+    // rlca
+    let mut c = Cpu::new();
+    c.rw(&R::A, 0b0000_0001);
+    c.execute(&c.decode(0x07)?)?;
+    assert_eq!(c.rr(&R::A), 0b0000_0010);
+    c.rw(&R::A, 0b1000_1000);
+    c.execute(&c.decode(0x07)?)?;
+    assert_eq!(c.rr(&R::A), 0b0001_0001);
+
+    Ok(())
+}
+
+#[test]
+fn test_execute_rrca() -> Result<(), Error> {
+    // rrca
+    let mut c = Cpu::new();
+    c.rw(&R::A, 0b0000_0010);
+    c.execute(&c.decode(0x0f)?)?;
+    assert_eq!(c.rr(&R::A), 0b0000_0001);
+    c.rw(&R::A, 0b0001_0001);
+    c.execute(&c.decode(0x0f)?)?;
+    assert_eq!(c.rr(&R::A), 0b1000_1000);
+
+    Ok(())
 }

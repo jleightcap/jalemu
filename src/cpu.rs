@@ -25,7 +25,7 @@ pub struct Cpu {
 // registers
 #[derive(Copy, Clone, Debug, PartialEq)]
 enum R {
-    A, F, B, C, D, E
+    A, F, B, C, D, E, H, L
 }
 // sandwich registers, read/write 2x8-bit registers as 1x16-bit register
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -39,8 +39,11 @@ enum Flag {
 }
 
 // program counter states
+#[derive(Debug, PartialEq)]
 enum PC {
     I,              // increment by PC instruction length
+    Im8,            // 8-bit immediate
+    Im16,           // 16-bit immediate
     J(usize),       // jump
 }
 
@@ -124,9 +127,54 @@ impl Cpu {
         }
     }
 
-    /* SANDWICH REGS {{{ */
+    fn reset(&mut self) {
+        self.a      = 0x00;
+        self.f      = 0x00;
+        self.b      = 0x00;
+        self.c      = 0x00;
+        self.d      = 0x00;
+        self.e      = 0x00;
+        self.h      = 0x00;
+        self.l      = 0x00;
+        self.ix     = 0x0000;
+        self.iy     = 0x0000;
+        self.pc     = 0x0000;
+        self.sp     = 0x0000;
+
+        self.ram    = [0x00; RAM_SIZE];
+    }
+
+    /* REGS {{{ */
+    // read from a register
+    fn rr(&self, r: &R) -> u8 {
+        match r {
+            R::A => self.a,
+            R::F => self.f,
+            R::B => self.b,
+            R::C => self.c,
+            R::D => self.d,
+            R::E => self.e,
+            R::H => self.h,
+            R::L => self.l,
+        }
+    }
+
+    // write to a register
+    fn rw(&mut self, r: &R, v: u8) {
+        match r {
+            R::A => self.a = v,
+            R::F => self.f = v,
+            R::B => self.b = v,
+            R::C => self.c = v,
+            R::D => self.d = v,
+            R::E => self.e = v,
+            R::H => self.h = v,
+            R::L => self.l = v,
+        }
+    }
+
     // read from a sandwich register
-    fn srr(&self, r: SR) -> u16 {
+    fn srr(&self, r: &SR) -> u16 {
         match r {
             SR::AF => ((self.a as u16) << 8) | self.f as u16,
             SR::BC => ((self.b as u16) << 8) | self.c as u16,
@@ -136,7 +184,7 @@ impl Cpu {
     }
 
     // write to a sandwich register
-    fn srw(&mut self, r: SR, x: u16) {
+    fn srw(&mut self, r: &SR, x: u16) {
         match r {
             SR::AF => {
                 self.a = ((x & 0xff00) >> 8) as u8;
@@ -232,30 +280,24 @@ impl Cpu {
             _ => Err(Error::new(ErrorKind::InvalidData, "read outside memory"))
         }
     }
+
+    fn imm8(&self) -> Result<u8, Error> {
+        let lo = self.read(self.pc + 1)?;
+        Ok(lo)
+    }
+
+    fn imm16(&self) -> Result<u16, Error> {
+        let (hi, lo) = (self.read(self.pc + 1)?, self.read(self.pc + 2)?);
+        Ok(((hi as u16) << 8) | lo as u16)
+    }
     /* }}} */
 
-    fn reset(&mut self) {
-        self.a      = 0x00;
-        self.f      = 0x00;
-        self.b      = 0x00;
-        self.c      = 0x00;
-        self.d      = 0x00;
-        self.e      = 0x00;
-        self.h      = 0x00;
-        self.l      = 0x00;
-        self.ix     = 0x0000;
-        self.iy     = 0x0000;
-        self.pc     = 0x0000;
-        self.sp     = 0x0000;
-
-        self.ram    = [0x00; RAM_SIZE];
-        //self.rom    = [0x00; ROM_SIZE];
-    }
 
     fn fetch(&self) -> Result<u8, Error> {
         self.read(self.pc)
     }
 
+    /* DECODE {{{ */
     fn decode(&self, instr: u8) -> Result<Instr, Error> {
         match instr {
             0x00 => Ok(Instr::NOP),
@@ -308,6 +350,160 @@ impl Cpu {
             _ => Err(Error::new(ErrorKind::InvalidData, "unexpected opcode")),
         }
     }
+    /* }}} */
+
+    fn execute(&mut self, instr: &Instr) -> Result<(), Error> {
+        let pc = match instr {
+            Instr::NOP              => self.nop(),
+            Instr::ADD16(a1, a2)    => self.add16(a1, a2),
+            Instr::DEC8(a)          => self.dec8(a),
+            Instr::DEC16(a)         => self.dec16(a),
+            Instr::INC8(a)          => self.inc8(a),
+            Instr::INC16(a)         => self.inc16(a),
+            Instr::LD8(a1, a2)      => self.ld8(a1, a2),
+            Instr::LD16(a1, a2)     => self.ld16(a1, a2),
+            Instr::RLCA             => self.rlca(),
+            Instr::RRCA             => self.rrca(),
+            _ => Err(Error::new(ErrorKind::InvalidData, "invalid instruction")),
+        }?;
+
+        Ok(match pc {
+            PC::I       => self.pc += 1,
+            PC::Im8     => self.pc += 2,
+            PC::Im16    => self.pc += 3,
+            PC::J(x)    => self.pc  = x,
+        })
+    }
+
+
+    /* OPCODES {{{ */
+    // get the value of an 8-bit argument
+    fn u8_arg(&self, a: &Arg8) -> Result<(u8, PC), Error> {
+        match a {
+            // op X, R
+            Arg8::Reg(r) => { Ok((self.rr(r), PC::I)) },
+            // op X, *
+            Arg8::U8     => { Ok((self.imm8()?, PC::Im8)) },
+            Arg8::Mem(addr) => match addr {
+                // op X, (**)
+                MemAddr::Imm     => { Ok((self.read(self.imm16()? as usize)?, PC::Im16)) }
+                // op X, (SR)
+                MemAddr::Reg(sr) => { Ok((self.read(self.srr(sr) as usize)?, PC::I)) }
+            },
+        }
+    }
+
+    // get the value of a 16-bit argument
+    fn u16_arg(&self, a: &Arg16) -> Result<(u16, PC), Error> {
+        match a {
+            Arg16::U16      => { Ok((self.imm16()?, PC::Im16)) },
+            Arg16::Reg(sr)  => { Ok((self.srr(sr), PC::I)) },
+        }
+    }
+
+    fn nop(&mut self) -> Result<PC, Error> {
+        Ok(PC::I)
+    }
+
+    fn add16(&mut self, dst: &Arg16, src: &Arg16) -> Result<PC, Error> {
+        let (src, pc) = self.u16_arg(src)?;
+        match dst {
+            // add SR, X
+            Arg16::Reg(sr)  => { self.srw(sr, self.srr(sr).wrapping_add(src)); Ok(pc) }
+            // add **, X
+            Arg16::U16 => Err(Error::new(ErrorKind::InvalidData, "add to immediate")),
+        }
+    }
+
+    fn dec8(&mut self, dst: &Arg8) -> Result<PC, Error> {
+        match dst {
+            // dec R
+            Arg8::Reg(r)    => { self.rw(r, self.rr(r).wrapping_sub(1)); Ok(PC::I) },
+            // dec *
+            Arg8::U8        => Err(Error::new(ErrorKind::InvalidData, "sub to constant")),
+            Arg8::Mem(addr) => match addr {
+                // dec [**]
+                MemAddr::Imm        => Err(Error::new(ErrorKind::InvalidData, "sub to constant")),
+                // dec [SR]
+                MemAddr::Reg(sr)    => { self.srw(sr, self.srr(sr).wrapping_sub(1)); Ok(PC::I) }
+            }
+        }
+    }
+
+    fn dec16(&mut self, dst: &Arg16) -> Result<PC, Error> {
+        match dst {
+            // dec SR
+            Arg16::Reg(sr) => { self.srw(sr, self.srr(sr).wrapping_sub(1)); Ok(PC::I) }
+            // dec **
+            Arg16::U16 => Err(Error::new(ErrorKind::InvalidData, "dec to immediate")),
+        }
+    }
+
+    fn inc8(&mut self, dst: &Arg8) -> Result<PC, Error> {
+        match dst {
+            // inc R
+            Arg8::Reg(r)    => { self.rw(r, self.rr(r).wrapping_add(1)); Ok(PC::I) },
+            // inc *
+            Arg8::U8        => Err(Error::new(ErrorKind::InvalidData, "add to constant")),
+            Arg8::Mem(addr) => match addr {
+                // inc [**]
+                MemAddr::Imm        => Err(Error::new(ErrorKind::InvalidData, "add to constant")),
+                // inc [SR]
+                MemAddr::Reg(sr)    => { self.srw(sr, self.srr(sr).wrapping_add(1)); Ok(PC::I) }
+            }
+        }
+    }
+
+    fn inc16(&mut self, dst: &Arg16) -> Result<PC, Error> {
+        match dst {
+            // inc SR
+            Arg16::Reg(sr) => { self.srw(sr, self.srr(sr).wrapping_add(1)); Ok(PC::I) }
+            // inc **
+            Arg16::U16 => Err(Error::new(ErrorKind::InvalidData, "inc to immediate")),
+        }
+    }
+
+
+    fn ld8(&mut self, dst: &Arg8, src: &Arg8) -> Result<PC, Error> {
+        let (src, pc) = self.u8_arg(src)?;
+        match dst {
+            // ld R, X
+            Arg8::Reg(r)    => { self.rw(r, src); Ok(pc) }
+            // ld *, X
+            Arg8::U8        => Err(Error::new(ErrorKind::InvalidData, "load to immediate")),
+            Arg8::Mem(addr) => match addr {
+                // ld (**), X
+                MemAddr::Imm        => Err(Error::new(ErrorKind::InvalidData, "load to immediate")),
+                // ld (SR), X
+                MemAddr::Reg(sr)    => { self.write(self.srr(sr) as usize, src)?; Ok(pc) },
+            },
+        }
+    }
+
+    fn ld16(&mut self, dst: &Arg16, src: &Arg16) -> Result<PC, Error> {
+        let (src, pc) = self.u16_arg(src)?;
+        match dst {
+            // ld SR, X
+            Arg16::Reg(sr)  => { self.srw(sr, src); Ok(pc) }
+            // ld **, X
+            Arg16::U16 => Err(Error::new(ErrorKind::InvalidData, "load to immediate")),
+        }
+    }
+
+    fn rlca(&mut self) -> Result<PC, Error> {
+        let prev = self.rr(&R::A);
+        let msb = (prev >> 7) & 0b1;
+        self.rw(&R::A, prev << 1 | (msb << 0));
+        Ok(PC::I)
+    }
+
+    fn rrca(&mut self) -> Result<PC, Error> {
+        let prev = self.rr(&R::A);
+        let lsb = (prev >> 0) & 0b1;
+        self.rw(&R::A, prev >> 1 | (lsb << 7));
+        Ok(PC::I)
+    }
+    /* }}} */
 }
 
 #[cfg(test)]
