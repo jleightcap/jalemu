@@ -46,12 +46,9 @@ fn test_fetch() {
     let mut c = Cpu::new();
     c.rom[0x0000] = 0xde;
     c.rom[0x0001] = 0xad;
-    c.rom[0x0002] = 0xbe;
-    c.rom[0x0003] = 0xef;
-    assert_eq!(c.fetch().unwrap(), 0xdead);
-    assert_eq!(c.pc, 0x0002);
-    assert_eq!(c.fetch().unwrap(), 0xbeef);
-    assert_eq!(c.pc, 0x0004);
+    assert_eq!(c.fetch().unwrap(), 0xde);
+    c.pc += 1;
+    assert_eq!(c.fetch().unwrap(), 0xad);
 
     // invalid fetch
     c.pc = 0x10000;

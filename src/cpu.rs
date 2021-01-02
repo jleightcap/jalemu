@@ -19,11 +19,20 @@ pub struct Cpu {
     ram:    [u8; RAM_SIZE],
     rom:    [u8; ROM_SIZE],
 }
+
+// sandwich registers, read/write 2x8-bit registers as 16bit
 enum SR {
-    AF, BC, DE              // sandwich registers, read/write 2x8-bit registers as 16bit
+    AF, BC, DE
 }
-enum Flag {                 // flags, stored as bits in F register
+
+// flags, stored as bits in F register
+enum Flag {
     C, N, PV, H, Z, S
+}
+
+enum PC {
+    I,              // increment by PC instruction length
+    J(usize),       // jump
 }
 
 impl Cpu {
@@ -166,11 +175,13 @@ impl Cpu {
         //self.rom    = [0x00; ROM_SIZE];
     }
 
-    fn fetch(&mut self) -> Result<u16, Error> {
-        let hi = self.read(self.pc    )? as u16;
-        let lo = self.read(self.pc + 1)? as u16;
-        self.pc += 2;
-        Ok((hi << 8) | lo)
+    fn fetch(&self) -> Result<u8, Error> {
+        self.read(self.pc)
+    }
+
+    fn decode(&self) -> Result<PC, Error> {
+        let instr = self.fetch()?;
+        Ok(PC::I)
     }
 }
 
