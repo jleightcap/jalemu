@@ -605,7 +605,6 @@ impl Cpu {
                         Arg8::Reg(R::A)
                     )),
             /* }}} */
-
             _ => Err(Error::new(ErrorKind::InvalidData, "unexpected opcode")),
         }
     }
