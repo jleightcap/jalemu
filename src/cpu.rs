@@ -44,7 +44,8 @@ enum PC {
     I,              // increment by PC instruction length
     Im8,            // 8-bit immediate
     Im16,           // 16-bit immediate
-    J(usize),       // jump
+    J(usize),       // absolute
+    JR(usize),      // relative jump
 }
 
 /* INSTRUCTIONS {{{ */
@@ -422,14 +423,14 @@ impl Cpu {
             Instr::RLCA             => self.rlca(),
             Instr::RRA              => self.rra(),
             Instr::RRCA             => self.rrca(),
-            _ => Err(Error::new(ErrorKind::InvalidData, "invalid instruction")),
         }?;
 
         Ok(match pc {
-            PC::I       => self.pc += 1,
-            PC::Im8     => self.pc += 2,
-            PC::Im16    => self.pc += 3,
-            PC::J(x)    => self.pc  = x,
+            PC::I       => self.pc = self.pc.wrapping_add(1) & 0xffff,
+            PC::Im8     => self.pc = self.pc.wrapping_add(2) & 0xffff,
+            PC::Im16    => self.pc = self.pc.wrapping_add(3) & 0xffff,
+            PC::J(x)    => self.pc = x,
+            PC::JR(x)   => self.pc = (self.pc as i8).wrapping_add(x as i8) as usize & 0xffff,
         })
     }
 
@@ -494,8 +495,13 @@ impl Cpu {
     }
 
     fn djnz(&mut self, dst: &Arg8) -> Result<PC, Error> {
-        // TODO
-        Ok(PC::I)
+        if self.fr(Flag::Z) {
+            let (dst, _) = self.u8_arg(dst)?;
+            Ok(PC::JR(dst as usize))
+        }
+        else {
+            Ok(PC::Im8)
+        }
     }
 
     fn inc8(&mut self, dst: &Arg8) -> Result<PC, Error> {
@@ -523,8 +529,8 @@ impl Cpu {
     }
 
     fn jr(&mut self, dst: &Arg8) -> Result<PC, Error> {
-        // TODO
-        Ok(PC::I)
+        let (dst, _) = self.u8_arg(dst)?;
+        Ok(PC::JR(dst as usize))
     }
 
     fn ld8(&mut self, dst: &Arg8, src: &Arg8) -> Result<PC, Error> {
@@ -558,7 +564,18 @@ impl Cpu {
     }
 
     fn rla(&mut self) -> Result<PC, Error> {
-        // TODO
+        fn bot(b: bool) -> u8 {
+            match b { false => 0, true  => 1, }
+        }
+        fn tob(t: u8) -> bool {
+            match t { 0 => false, 1 => true, _ => panic!("bad flag"), }
+        }
+        let prev = self.rr(&R::A);
+        let cf = self.fr(Flag::C);
+        // rotate left, previous C flag in LSB
+        self.rw(&R::A, prev << 1 | bot(cf));
+        // previous A MSB in C flag
+        self.fw(Flag::C, tob((prev >> 7) & 0b1));
         Ok(PC::I)
     }
 
@@ -570,7 +587,18 @@ impl Cpu {
     }
 
     fn rra(&mut self) -> Result<PC, Error> {
-        // TODO
+        fn bot(b: bool) -> u8 {
+            match b { false => 0, true  => 1, }
+        }
+        fn tob(t: u8) -> bool {
+            match t { 0 => false, 1 => true, _ => panic!("bad flag"), }
+        }
+        let prev = self.rr(&R::A);
+        let cf = self.fr(Flag::C);
+        // rotate right, previous C flag in MSB
+        self.rw(&R::A, prev >> 1 | (bot(cf) << 7));
+        // previous A LSB in C flag
+        self.fw(Flag::C, tob(prev & 0b1));
         Ok(PC::I)
     }
 

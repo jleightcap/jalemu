@@ -372,36 +372,31 @@ fn test_u16_arg() -> Result<(), Error> {
 fn test_execute_nop() -> Result<(), Error> {
     let mut c = Cpu::new();
     c.execute(&c.decode(0x00)?)?;
+    assert_eq!(c.pc, 0x0001);
     Ok(())
 }
 
 #[test]
 fn test_execute_ld8() -> Result<(), Error> {
-    // ld (bc), a
+    // ld (SR), R
     let mut c = Cpu::new();
     c.rw(&R::A, 0xfe);
     c.srw(&SR::BC, 0xff00);
     c.execute(&c.decode(0x02)?)?;
     assert_eq!(c.read(0xff00)?, 0xfe);
 
-    // ld b, *
+    // ld R, *
     let mut c = Cpu::new();
     insert_imm8(&mut c, 0xfe);
     c.execute(&c.decode(0x06)?)?;
     assert_eq!(c.rr(&R::B), 0xfe);
 
-    // ld a, (bc)
+    // ld R, (SR)
     let mut c = Cpu::new();
     c.srw(&SR::BC, 0xff00);
     c.write(0xff00, 0xfe)?;
     c.execute(&c.decode(0x0a)?)?;
     assert_eq!(c.rr(&R::A), 0xfe);
-
-    // ld c, *
-    let mut c = Cpu::new();
-    insert_imm8(&mut c, 0xfe);
-    c.execute(&c.decode(0x0e)?)?;
-    assert_eq!(c.rr(&R::C), 0xfe);
 
     Ok(())
 }
@@ -415,22 +410,22 @@ fn test_execute_ld16() -> Result<(), Error> {
     assert_eq!(c.pc, 0x0003);
     assert_eq!(c.srr(&SR::BC), 0xdead);
 
+    // ld de, **
+    let mut c = Cpu::new();
+    insert_imm16(&mut c, 0xbeef);
+    c.execute(&c.decode(0x11)?)?;
+    assert_eq!(c.srr(&SR::DE), 0xbeef);
+
     Ok(())
 }
 
 #[test]
 fn test_execute_inc8() -> Result<(), Error> {
-    // inc b
+    // inc R
     let mut c = Cpu::new();
     c.rw(&R::B, 0xff);
     c.execute(&c.decode(0x04)?)?;
     assert_eq!(c.rr(&R::B), 0x00);
-
-    // inc c
-    let mut c = Cpu::new();
-    c.rw(&R::C, 0x00);
-    c.execute(&c.decode(0x0c)?)?;
-    assert_eq!(c.rr(&R::C), 0x01);
 
     Ok(())
 }
@@ -443,12 +438,18 @@ fn test_execute_inc16() -> Result<(), Error> {
     c.execute(&c.decode(0x03)?)?;
     assert_eq!(c.srr(&SR::BC), 0x0000);
 
+    // inc de
+    let mut c = Cpu::new();
+    c.srw(&SR::DE, 0x010f);
+    c.execute(&c.decode(0x13)?)?;
+    assert_eq!(c.srr(&SR::DE), 0x0110);
+
     Ok(())
 }
 
 #[test]
 fn test_execute_add16() -> Result<(), Error> {
-    // add hl, bc
+    // add SR, SR
     let mut c = Cpu::new();
     c.srw(&SR::BC, 0x0f);
     c.srw(&SR::HL, 0xf0);
@@ -460,24 +461,18 @@ fn test_execute_add16() -> Result<(), Error> {
 
 #[test]
 fn test_execute_dec8() -> Result<(), Error> {
-    // dec b
+    // dec R
     let mut c = Cpu::new();
     c.rw(&R::B, 0x00);
     c.execute(&c.decode(0x05)?)?;
     assert_eq!(c.rr(&R::B), 0xff);
-
-    // dec c
-    let mut c = Cpu::new();
-    c.rw(&R::C, 0x01);
-    c.execute(&c.decode(0x0d)?)?;
-    assert_eq!(c.rr(&R::C), 0x00);
 
     Ok(())
 }
 
 #[test]
 fn test_execute_dec16() -> Result<(), Error> {
-    // dec bc
+    // dec SR
     let mut c = Cpu::new();
     c.srw(&SR::BC, 0x0000);
     c.execute(&c.decode(0x0b)?)?;
@@ -510,6 +505,72 @@ fn test_execute_rrca() -> Result<(), Error> {
     c.rw(&R::A, 0b0001_0001);
     c.execute(&c.decode(0x0f)?)?;
     assert_eq!(c.rr(&R::A), 0b1000_1000);
+
+    Ok(())
+}
+
+#[test]
+fn test_execute_rla() -> Result<(), Error> {
+    // rla
+    let mut c = Cpu::new();
+    c.fw(Flag::C, true);
+    c.rw(&R::A, 0b0100_0000);
+    c.execute(&c.decode(0x17)?)?;
+    assert_eq!(c.rr(&R::A), 0b1000_0001);
+
+    c.fw(Flag::C, false);
+    c.rw(&R::A, 0b1000_0000);
+    c.execute(&c.decode(0x17)?)?;
+    assert_eq!(c.rr(&R::A), 0b0000_0000);
+
+    Ok(())
+}
+
+#[test]
+fn test_execute_rra() -> Result<(), Error> {
+    // rra
+    let mut c = Cpu::new();
+    c.fw(Flag::C, true);
+    c.rw(&R::A, 0b0000_0010);
+    c.execute(&c.decode(0x1f)?)?;
+    assert_eq!(c.rr(&R::A), 0b1000_0001);
+
+    c.fw(Flag::C, false);
+    c.rw(&R::A, 0b0000_0001);
+    c.execute(&c.decode(0x1f)?)?;
+    assert_eq!(c.rr(&R::A), 0b0000_0000);
+    Ok(())
+}
+
+#[test]
+fn test_execute_djnz() -> Result<(), Error> {
+    // djnz *
+    let mut c = Cpu::new();
+    c.fw(Flag::Z, true);
+    insert_imm8(&mut c, (50 as i8) as u8);
+    c.execute(&c.decode(0x10)?)?;
+    assert_eq!(c.pc as u16, 50);
+
+    c.fw(Flag::Z, false);
+    insert_imm8(&mut c, (-1 as i8) as u8);
+    c.execute(&c.decode(0x10)?)?;
+    assert_eq!(c.pc as u16, 52);
+
+    Ok(())
+}
+
+#[test]
+fn test_execute_jr() -> Result<(), Error> {
+    // jr *
+    let mut c = Cpu::new();
+    // jump forward
+    insert_imm8(&mut c, (50 as i8) as u8);
+    c.execute(&c.decode(0x18)?)?;
+    assert_eq!(c.pc, 50);
+    // jump backward
+    insert_imm8(&mut c, (-5 as i8) as u8);
+    c.execute(&c.decode(0x18)?)?;
+    assert_eq!(c.pc, 45);
 
     Ok(())
 }
