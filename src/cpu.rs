@@ -104,6 +104,7 @@ enum ArgF {
 
 #[derive(Debug, PartialEq)]
 enum Instr {
+    ADC8    (Arg8, Arg8),
     ADD8    (Arg8, Arg8),
     ADD16   (Arg16, Arg16),
     CCF,
@@ -801,6 +802,72 @@ impl Cpu {
                         Arg8::Reg(R::A)
                     )),
             /* }}} */
+            /* 0x8X {{{ */
+            0x80 => Ok(Instr::ADD8(
+                        Arg8::Reg(R::A),
+                        Arg8::Reg(R::B)
+                    )),
+            0x81 => Ok(Instr::ADD8(
+                        Arg8::Reg(R::A),
+                        Arg8::Reg(R::C)
+                    )),
+            0x82 => Ok(Instr::ADD8(
+                        Arg8::Reg(R::A),
+                        Arg8::Reg(R::D)
+                    )),
+            0x83 => Ok(Instr::ADD8(
+                        Arg8::Reg(R::A),
+                        Arg8::Reg(R::E)
+                    )),
+            0x84 => Ok(Instr::ADD8(
+                        Arg8::Reg(R::A),
+                        Arg8::Reg(R::H)
+                    )),
+            0x85 => Ok(Instr::ADD8(
+                        Arg8::Reg(R::A),
+                        Arg8::Reg(R::L)
+                    )),
+            0x86 => Ok(Instr::ADD8(
+                        Arg8::Reg(R::A),
+                        Arg8::Mem(MemAddr::Reg(SR::HL))
+                    )),
+            0x87 => Ok(Instr::ADD8(
+                        Arg8::Reg(R::A),
+                        Arg8::Reg(R::A)
+                    )),
+            0x88 => Ok(Instr::ADC8(
+                        Arg8::Reg(R::A),
+                        Arg8::Reg(R::B)
+                    )),
+            0x89 => Ok(Instr::ADC8(
+                        Arg8::Reg(R::A),
+                        Arg8::Reg(R::C)
+                    )),
+            0x8a => Ok(Instr::ADC8(
+                        Arg8::Reg(R::A),
+                        Arg8::Reg(R::D)
+                    )),
+            0x8b => Ok(Instr::ADC8(
+                        Arg8::Reg(R::A),
+                        Arg8::Reg(R::E)
+                    )),
+            0x8c => Ok(Instr::ADC8(
+                        Arg8::Reg(R::A),
+                        Arg8::Reg(R::H)
+                    )),
+            0x8d => Ok(Instr::ADC8(
+                        Arg8::Reg(R::A),
+                        Arg8::Reg(R::L)
+                    )),
+            0x8e => Ok(Instr::ADC8(
+                        Arg8::Reg(R::A),
+                        Arg8::Mem(MemAddr::Reg(SR::HL))
+                    )),
+            0x8f => Ok(Instr::ADC8(
+                        Arg8::Reg(R::A),
+                        Arg8::Reg(R::A)
+                    )),
+            /* }}} */
             _ => Err(Error::new(ErrorKind::InvalidData, "unexpected opcode")),
         }
     }
@@ -808,6 +875,7 @@ impl Cpu {
 
     fn execute(&mut self, instr: &Instr) -> Result<(), Error> {
         let pc = match instr {
+            Instr::ADC8(a1, a2)     => self.adc8(a1, a2),
             Instr::ADD8(a1, a2)     => self.add8(a1, a2),
             Instr::ADD16(a1, a2)    => self.add16(a1, a2),
             Instr::CCF              => self.ccf(),
@@ -865,6 +933,11 @@ impl Cpu {
             Arg16::Reg(sr)  => { Ok((self.srr(sr), PC::I)) },
             Arg16::Mem(_)   => Err(Error::new(ErrorKind::InvalidData, "16-bit arg size mismatch")),
         }
+    }
+
+    fn adc8(&mut self, dst: &Arg8, src: &Arg8) -> Result<PC, Error> {
+        // TODO: ADC
+        Ok(PC::I)
     }
 
     fn add8(&mut self, dst: &Arg8, src: &Arg8) -> Result<PC, Error> {

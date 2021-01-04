@@ -563,6 +563,46 @@ fn test_decode_0x7() -> Result<(), Error> {
 }
 
 #[test]
+fn test_decode_0x8() -> Result<(), Error> {
+    let c = Cpu::new();
+
+    let i = c.decode(0x80)?;
+    assert_eq!(i, Instr::ADD8(Arg8::Reg(R::A), Arg8::Reg(R::B)));
+    let i = c.decode(0x81)?;
+    assert_eq!(i, Instr::ADD8(Arg8::Reg(R::A), Arg8::Reg(R::C)));
+    let i = c.decode(0x82)?;
+    assert_eq!(i, Instr::ADD8(Arg8::Reg(R::A), Arg8::Reg(R::D)));
+    let i = c.decode(0x83)?;
+    assert_eq!(i, Instr::ADD8(Arg8::Reg(R::A), Arg8::Reg(R::E)));
+    let i = c.decode(0x84)?;
+    assert_eq!(i, Instr::ADD8(Arg8::Reg(R::A), Arg8::Reg(R::H)));
+    let i = c.decode(0x85)?;
+    assert_eq!(i, Instr::ADD8(Arg8::Reg(R::A), Arg8::Reg(R::L)));
+    let i = c.decode(0x86)?;
+    assert_eq!(i, Instr::ADD8(Arg8::Reg(R::A), Arg8::Mem(MemAddr::Reg(SR::HL))));
+    let i = c.decode(0x87)?;
+    assert_eq!(i, Instr::ADD8(Arg8::Reg(R::A), Arg8::Reg(R::A)));
+    let i = c.decode(0x88)?;
+    assert_eq!(i, Instr::ADC8(Arg8::Reg(R::A), Arg8::Reg(R::B)));
+    let i = c.decode(0x89)?;
+    assert_eq!(i, Instr::ADC8(Arg8::Reg(R::A), Arg8::Reg(R::C)));
+    let i = c.decode(0x8a)?;
+    assert_eq!(i, Instr::ADC8(Arg8::Reg(R::A), Arg8::Reg(R::D)));
+    let i = c.decode(0x8b)?;
+    assert_eq!(i, Instr::ADC8(Arg8::Reg(R::A), Arg8::Reg(R::E)));
+    let i = c.decode(0x8c)?;
+    assert_eq!(i, Instr::ADC8(Arg8::Reg(R::A), Arg8::Reg(R::H)));
+    let i = c.decode(0x8d)?;
+    assert_eq!(i, Instr::ADC8(Arg8::Reg(R::A), Arg8::Reg(R::L)));
+    let i = c.decode(0x8e)?;
+    assert_eq!(i, Instr::ADC8(Arg8::Reg(R::A), Arg8::Mem(MemAddr::Reg(SR::HL))));
+    let i = c.decode(0x8f)?;
+    assert_eq!(i, Instr::ADC8(Arg8::Reg(R::A), Arg8::Reg(R::A)));
+
+    Ok(())
+}
+
+#[test]
 fn test_u8_arg() -> Result<(), Error> {
     let mut c = Cpu::new();
 
