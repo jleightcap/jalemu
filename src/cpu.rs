@@ -1226,8 +1226,23 @@ impl Cpu {
         Ok(PC::I)
     }
 
-    fn sbc8(&mut self, a1: &Arg8, a2: &Arg8) -> Result<PC, Error> {
-        Ok(PC::I)
+    fn sbc8(&mut self, dst: &Arg8, src: &Arg8) -> Result<PC, Error> {
+        fn bot(b: bool) -> u8 {
+            match b { false => 0, true  => 1, }
+        }
+        let (src, pc) = self.u8_arg(src)?;
+        match dst {
+            // sbc R, X
+            Arg8::Reg(r)    => {
+                self.rw(r, self.rr(r)
+                               .wrapping_sub(src).wrapping_sub(bot(self.fr(&Flag::C))));
+                Ok(pc)
+            }
+            // sbc *, X
+            Arg8::U8        => Err(Error::new(ErrorKind::InvalidData, "add to immediate")),
+            // sbc [**], X
+            Arg8::Mem(_)    => Err(Error::new(ErrorKind::InvalidData, "add to immediate")),
+        }
     }
 
     fn scf(&mut self) -> Result<PC, Error> {
@@ -1235,8 +1250,11 @@ impl Cpu {
         Ok(PC::I)
     }
 
-    fn sub8(&mut self, a: &Arg8) -> Result<PC, Error> {
-        Ok(PC::I)
+    fn sub8(&mut self, src: &Arg8) -> Result<PC, Error> {
+        let (src, pc) = self.u8_arg(src)?;
+        // add A, X
+        self.rw(&R::A, self.rr(&R::A).wrapping_sub(src));
+        Ok(pc)
     }
 
     /* }}} */

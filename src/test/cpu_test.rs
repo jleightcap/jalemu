@@ -880,6 +880,44 @@ fn test_execute_add16() -> Result<(), Error> {
 }
 
 #[test]
+fn test_execute_sub8() -> Result<(), Error> {
+    // sub R
+    let mut c = Cpu::new();
+    c.rw(&R::A, 0xff);
+    c.rw(&R::B, 0x0f);
+    c.execute(&c.decode(0x90)?)?;
+    assert_eq!(c.rr(&R::A), 0xf0);
+    Ok(())
+}
+
+#[test]
+fn test_execute_sbc8() -> Result<(), Error> {
+    // sbc R, R
+    let mut c = Cpu::new();
+    c.rw(&R::A, 0xff);
+    c.rw(&R::B, 0x0f);
+    c.fw(&Flag::C, true);
+    c.execute(&c.decode(0x98)?)?;
+    assert_eq!(c.rr(&R::A), 0xef);
+    c.rw(&R::A, 0x02);
+    c.fw(&Flag::C, true);
+    c.execute(&c.decode(0x9f)?)?;
+    assert_eq!(c.rr(&R::A), 0xff);
+
+    // sbc *, X
+    let mut c = Cpu::new();
+    let e = c.execute(&Instr::SBC8(Arg8::U8, Arg8::Reg(R::A))).map_err(|e| e.kind());
+    assert_eq!(e, Err(ErrorKind::InvalidData));
+
+    // adc [**], X
+    let mut c = Cpu::new();
+    let e = c.execute(&Instr::SBC8(Arg8::Mem(MemAddr::Imm), Arg8::Reg(R::A))).map_err(|e| e.kind());
+    assert_eq!(e, Err(ErrorKind::InvalidData));
+
+    Ok(())
+}
+
+#[test]
 fn test_execute_dec8() -> Result<(), Error> {
     // dec R
     let mut c = Cpu::new();
