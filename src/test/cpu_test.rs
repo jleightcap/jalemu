@@ -643,6 +643,86 @@ fn test_decode_0x9() -> Result<(), Error> {
 }
 
 #[test]
+fn test_decode_0xa() -> Result<(), Error> {
+    let c = Cpu::new();
+
+    let i = c.decode(0xa0)?;
+    assert_eq!(i, Instr::AND8(Arg8::Reg(R::B)));
+    let i = c.decode(0xa1)?;
+    assert_eq!(i, Instr::AND8(Arg8::Reg(R::C)));
+    let i = c.decode(0xa2)?;
+    assert_eq!(i, Instr::AND8(Arg8::Reg(R::D)));
+    let i = c.decode(0xa3)?;
+    assert_eq!(i, Instr::AND8(Arg8::Reg(R::E)));
+    let i = c.decode(0xa4)?;
+    assert_eq!(i, Instr::AND8(Arg8::Reg(R::H)));
+    let i = c.decode(0xa5)?;
+    assert_eq!(i, Instr::AND8(Arg8::Reg(R::L)));
+    let i = c.decode(0xa6)?;
+    assert_eq!(i, Instr::AND8(Arg8::Mem(MemAddr::Reg(SR::HL))));
+    let i = c.decode(0xa7)?;
+    assert_eq!(i, Instr::AND8(Arg8::Reg(R::A)));
+    let i = c.decode(0xa8)?;
+    assert_eq!(i, Instr::XOR8(Arg8::Reg(R::B)));
+    let i = c.decode(0xa9)?;
+    assert_eq!(i, Instr::XOR8(Arg8::Reg(R::C)));
+    let i = c.decode(0xaa)?;
+    assert_eq!(i, Instr::XOR8(Arg8::Reg(R::D)));
+    let i = c.decode(0xab)?;
+    assert_eq!(i, Instr::XOR8(Arg8::Reg(R::E)));
+    let i = c.decode(0xac)?;
+    assert_eq!(i, Instr::XOR8(Arg8::Reg(R::H)));
+    let i = c.decode(0xad)?;
+    assert_eq!(i, Instr::XOR8(Arg8::Reg(R::L)));
+    let i = c.decode(0xae)?;
+    assert_eq!(i, Instr::XOR8(Arg8::Mem(MemAddr::Reg(SR::HL))));
+    let i = c.decode(0xaf)?;
+    assert_eq!(i, Instr::XOR8(Arg8::Reg(R::A)));
+
+    Ok(())
+}
+
+#[test]
+fn test_decode_0xb() -> Result<(), Error> {
+    let c = Cpu::new();
+
+    let i = c.decode(0xb0)?;
+    assert_eq!(i, Instr::OR8(Arg8::Reg(R::B)));
+    let i = c.decode(0xb1)?;
+    assert_eq!(i, Instr::OR8(Arg8::Reg(R::C)));
+    let i = c.decode(0xb2)?;
+    assert_eq!(i, Instr::OR8(Arg8::Reg(R::D)));
+    let i = c.decode(0xb3)?;
+    assert_eq!(i, Instr::OR8(Arg8::Reg(R::E)));
+    let i = c.decode(0xb4)?;
+    assert_eq!(i, Instr::OR8(Arg8::Reg(R::H)));
+    let i = c.decode(0xb5)?;
+    assert_eq!(i, Instr::OR8(Arg8::Reg(R::L)));
+    let i = c.decode(0xb6)?;
+    assert_eq!(i, Instr::OR8(Arg8::Mem(MemAddr::Reg(SR::HL))));
+    let i = c.decode(0xb7)?;
+    assert_eq!(i, Instr::OR8(Arg8::Reg(R::A)));
+    let i = c.decode(0xb8)?;
+    assert_eq!(i, Instr::CP8(Arg8::Reg(R::B)));
+    let i = c.decode(0xb9)?;
+    assert_eq!(i, Instr::CP8(Arg8::Reg(R::C)));
+    let i = c.decode(0xba)?;
+    assert_eq!(i, Instr::CP8(Arg8::Reg(R::D)));
+    let i = c.decode(0xbb)?;
+    assert_eq!(i, Instr::CP8(Arg8::Reg(R::E)));
+    let i = c.decode(0xbc)?;
+    assert_eq!(i, Instr::CP8(Arg8::Reg(R::H)));
+    let i = c.decode(0xbd)?;
+    assert_eq!(i, Instr::CP8(Arg8::Reg(R::L)));
+    let i = c.decode(0xbe)?;
+    assert_eq!(i, Instr::CP8(Arg8::Mem(MemAddr::Reg(SR::HL))));
+    let i = c.decode(0xbf)?;
+    assert_eq!(i, Instr::CP8(Arg8::Reg(R::A)));
+
+    Ok(())
+}
+
+#[test]
 fn test_u8_arg() -> Result<(), Error> {
     let mut c = Cpu::new();
 
@@ -909,7 +989,7 @@ fn test_execute_sbc8() -> Result<(), Error> {
     let e = c.execute(&Instr::SBC8(Arg8::U8, Arg8::Reg(R::A))).map_err(|e| e.kind());
     assert_eq!(e, Err(ErrorKind::InvalidData));
 
-    // adc [**], X
+    // sbc [**], X
     let mut c = Cpu::new();
     let e = c.execute(&Instr::SBC8(Arg8::Mem(MemAddr::Imm), Arg8::Reg(R::A))).map_err(|e| e.kind());
     assert_eq!(e, Err(ErrorKind::InvalidData));
@@ -1124,6 +1204,42 @@ fn test_execute_ccf() -> Result<(), Error> {
     c.fw(&Flag::C, true);
     c.execute(&c.decode(0x3f)?)?;
     assert_eq!(c.fr(&Flag::C), false);
+
+    Ok(())
+}
+
+#[test]
+fn test_execute_and8() -> Result<(), Error> {
+    // and R
+    let mut c = Cpu::new();
+    c.rw(&R::A, 0xff);
+    c.rw(&R::B, 0x0f);
+    c.execute(&c.decode(0xa0)?)?;
+    assert_eq!(c.rr(&R::A), 0xff & 0x0f);
+
+    Ok(())
+}
+
+#[test]
+fn test_execute_xor8() -> Result<(), Error> {
+    // and R
+    let mut c = Cpu::new();
+    c.rw(&R::A, 0x00);
+    c.rw(&R::B, 0xff);
+    c.execute(&c.decode(0xa8)?)?;
+    assert_eq!(c.rr(&R::A), 0x00 ^ 0xff);
+
+    Ok(())
+}
+
+#[test]
+fn test_execute_or8() -> Result<(), Error> {
+    // or R
+    let mut c = Cpu::new();
+    c.rw(&R::A, 0xf0);
+    c.rw(&R::B, 0x0f);
+    c.execute(&c.decode(0xb0)?)?;
+    assert_eq!(c.rr(&R::A), 0xf0 | 0x0f);
 
     Ok(())
 }

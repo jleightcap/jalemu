@@ -107,7 +107,9 @@ enum Instr {
     ADC8    (Arg8, Arg8),
     ADD8    (Arg8, Arg8),
     ADD16   (Arg16, Arg16),
+    AND8    (Arg8),
     CCF,
+    CP8     (Arg8),
     CPL,
     DAA,
     DEC8    (Arg8),
@@ -121,6 +123,7 @@ enum Instr {
     LD8     (Arg8, Arg8),
     LD16    (Arg16, Arg16),
     NOP,
+    OR8     (Arg8),
     RLA,
     RLCA,
     RRA,
@@ -128,6 +131,7 @@ enum Instr {
     SBC8    (Arg8, Arg8),
     SCF,
     SUB8    (Arg8),
+    XOR8    (Arg8),
 }
 /* }}} */
 
@@ -923,6 +927,106 @@ impl Cpu {
                         Arg8::Reg(R::A)
                     )),
             /* }}} */
+            /* 0xaX {{{ */
+            0xa0 => Ok(Instr::AND8(
+                        Arg8::Reg(R::B)
+                    )),
+            0xa1 => Ok(Instr::AND8(
+                        Arg8::Reg(R::C)
+                    )),
+            0xa2 => Ok(Instr::AND8(
+                        Arg8::Reg(R::D)
+                    )),
+            0xa3 => Ok(Instr::AND8(
+                        Arg8::Reg(R::E)
+                    )),
+            0xa4 => Ok(Instr::AND8(
+                        Arg8::Reg(R::H)
+                    )),
+            0xa5 => Ok(Instr::AND8(
+                        Arg8::Reg(R::L)
+                    )),
+            0xa6 => Ok(Instr::AND8(
+                        Arg8::Mem(MemAddr::Reg(SR::HL))
+                    )),
+            0xa7 => Ok(Instr::AND8(
+                        Arg8::Reg(R::A)
+                    )),
+            0xa8 => Ok(Instr::XOR8(
+                        Arg8::Reg(R::B)
+                    )),
+            0xa9 => Ok(Instr::XOR8(
+                        Arg8::Reg(R::C)
+                    )),
+            0xaa => Ok(Instr::XOR8(
+                        Arg8::Reg(R::D)
+                    )),
+            0xab => Ok(Instr::XOR8(
+                        Arg8::Reg(R::E)
+                    )),
+            0xac => Ok(Instr::XOR8(
+                        Arg8::Reg(R::H)
+                    )),
+            0xad => Ok(Instr::XOR8(
+                        Arg8::Reg(R::L)
+                    )),
+            0xae => Ok(Instr::XOR8(
+                        Arg8::Mem(MemAddr::Reg(SR::HL))
+                    )),
+            0xaf => Ok(Instr::XOR8(
+                        Arg8::Reg(R::A)
+                    )),
+            /* }}} */
+            /* 0xbX {{{ */
+            0xb0 => Ok(Instr::OR8(
+                        Arg8::Reg(R::B)
+                    )),
+            0xb1 => Ok(Instr::OR8(
+                        Arg8::Reg(R::C)
+                    )),
+            0xb2 => Ok(Instr::OR8(
+                        Arg8::Reg(R::D)
+                    )),
+            0xb3 => Ok(Instr::OR8(
+                        Arg8::Reg(R::E)
+                    )),
+            0xb4 => Ok(Instr::OR8(
+                        Arg8::Reg(R::H)
+                    )),
+            0xb5 => Ok(Instr::OR8(
+                        Arg8::Reg(R::L)
+                    )),
+            0xb6 => Ok(Instr::OR8(
+                        Arg8::Mem(MemAddr::Reg(SR::HL))
+                    )),
+            0xb7 => Ok(Instr::OR8(
+                        Arg8::Reg(R::A)
+                    )),
+            0xb8 => Ok(Instr::CP8(
+                        Arg8::Reg(R::B)
+                    )),
+            0xb9 => Ok(Instr::CP8(
+                        Arg8::Reg(R::C)
+                    )),
+            0xba => Ok(Instr::CP8(
+                        Arg8::Reg(R::D)
+                    )),
+            0xbb => Ok(Instr::CP8(
+                        Arg8::Reg(R::E)
+                    )),
+            0xbc => Ok(Instr::CP8(
+                        Arg8::Reg(R::H)
+                    )),
+            0xbd => Ok(Instr::CP8(
+                        Arg8::Reg(R::L)
+                    )),
+            0xbe => Ok(Instr::CP8(
+                        Arg8::Mem(MemAddr::Reg(SR::HL))
+                    )),
+            0xbf => Ok(Instr::CP8(
+                        Arg8::Reg(R::A)
+                    )),
+            /* }}} */
             _ => Err(Error::new(ErrorKind::InvalidData, "unexpected opcode")),
         }
     }
@@ -933,7 +1037,9 @@ impl Cpu {
             Instr::ADC8(a1, a2)     => self.adc8(a1, a2),
             Instr::ADD8(a1, a2)     => self.add8(a1, a2),
             Instr::ADD16(a1, a2)    => self.add16(a1, a2),
+            Instr::AND8(a)          => self.and8(a),
             Instr::CCF              => self.ccf(),
+            Instr::CP8(a)           => self.cp8(a),
             Instr::CPL              => self.cpl(),
             Instr::DAA              => self.daa(),
             Instr::DEC8(a)          => self.dec8(a),
@@ -947,6 +1053,7 @@ impl Cpu {
             Instr::LD8(a1, a2)      => self.ld8(a1, a2),
             Instr::LD16(a1, a2)     => self.ld16(a1, a2),
             Instr::NOP              => self.nop(),
+            Instr::OR8(a)           => self.or8(a),
             Instr::RLA              => self.rla(),
             Instr::RLCA             => self.rlca(),
             Instr::RRA              => self.rra(),
@@ -954,6 +1061,7 @@ impl Cpu {
             Instr::SBC8(a1, a2)     => self.sbc8(a1, a2),
             Instr::SCF              => self.scf(),
             Instr::SUB8(a)          => self.sub8(a),
+            Instr::XOR8(a)          => self.xor8(a),
         }?;
 
         Ok(match pc {
@@ -1041,8 +1149,20 @@ impl Cpu {
         }
     }
 
+    fn and8(&mut self, src: &Arg8) -> Result<PC, Error> {
+        let (src, pc) = self.u8_arg(src)?;
+        // and A, X
+        self.rw(&R::A, self.rr(&R::A) & src);
+        Ok(pc)
+    }
+
     fn ccf(&mut self) -> Result<PC, Error> {
         self.fw(&Flag::C, false);
+        Ok(PC::I)
+    }
+
+    fn cp8(&mut self, src: &Arg8) -> Result<PC, Error> {
+        // TODO: cp R
         Ok(PC::I)
     }
 
@@ -1180,6 +1300,13 @@ impl Cpu {
         Ok(PC::I)
     }
 
+    fn or8(&mut self, src: &Arg8) -> Result<PC, Error> {
+        let (src, pc) = self.u8_arg(src)?;
+        // or A, X
+        self.rw(&R::A, self.rr(&R::A) | src);
+        Ok(pc)
+    }
+
     fn rla(&mut self) -> Result<PC, Error> {
         fn bot(b: bool) -> u8 {
             match b { false => 0, true  => 1, }
@@ -1252,8 +1379,15 @@ impl Cpu {
 
     fn sub8(&mut self, src: &Arg8) -> Result<PC, Error> {
         let (src, pc) = self.u8_arg(src)?;
-        // add A, X
+        // sub A, X
         self.rw(&R::A, self.rr(&R::A).wrapping_sub(src));
+        Ok(pc)
+    }
+
+    fn xor8(&mut self, src: &Arg8) -> Result<PC, Error> {
+        let (src, pc) = self.u8_arg(src)?;
+        // xor A, X
+        self.rw(&R::A, self.rr(&R::A) ^ src);
         Ok(pc)
     }
 
