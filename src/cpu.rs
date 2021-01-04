@@ -113,6 +113,7 @@ enum Instr {
     DEC16   (Arg16),
     DJNZ    (Arg8),
     EX      (Arg16, Arg16),
+    HALT,
     INC8    (Arg8),
     INC16   (Arg16),
     JR      (ArgF, Arg8),
@@ -737,6 +738,69 @@ impl Cpu {
                         Arg8::Reg(R::A)
                     )),
             /* }}} */
+            /* 0x7X {{{ */
+            0x70 => Ok(Instr::LD8(
+                        Arg8::Mem(MemAddr::Reg(SR::HL)),
+                        Arg8::Reg(R::B)
+                    )),
+            0x71 => Ok(Instr::LD8(
+                        Arg8::Mem(MemAddr::Reg(SR::HL)),
+                        Arg8::Reg(R::C)
+                    )),
+            0x72 => Ok(Instr::LD8(
+                        Arg8::Mem(MemAddr::Reg(SR::HL)),
+                        Arg8::Reg(R::D)
+                    )),
+            0x73 => Ok(Instr::LD8(
+                        Arg8::Mem(MemAddr::Reg(SR::HL)),
+                        Arg8::Reg(R::E)
+                    )),
+            0x74 => Ok(Instr::LD8(
+                        Arg8::Mem(MemAddr::Reg(SR::HL)),
+                        Arg8::Reg(R::H)
+                    )),
+            0x75 => Ok(Instr::LD8(
+                        Arg8::Mem(MemAddr::Reg(SR::HL)),
+                        Arg8::Reg(R::L)
+                    )),
+            0x76 => Ok(Instr::HALT),
+            0x77 => Ok(Instr::LD8(
+                        Arg8::Mem(MemAddr::Reg(SR::HL)),
+                        Arg8::Reg(R::A)
+                    )),
+            0x78 => Ok(Instr::LD8(
+                        Arg8::Reg(R::A),
+                        Arg8::Reg(R::B)
+                    )),
+            0x79 => Ok(Instr::LD8(
+                        Arg8::Reg(R::A),
+                        Arg8::Reg(R::C)
+                    )),
+            0x7a => Ok(Instr::LD8(
+                        Arg8::Reg(R::A),
+                        Arg8::Reg(R::D)
+                    )),
+            0x7b => Ok(Instr::LD8(
+                        Arg8::Reg(R::A),
+                        Arg8::Reg(R::E)
+                    )),
+            0x7c => Ok(Instr::LD8(
+                        Arg8::Reg(R::A),
+                        Arg8::Reg(R::H)
+                    )),
+            0x7d => Ok(Instr::LD8(
+                        Arg8::Reg(R::A),
+                        Arg8::Reg(R::L)
+                    )),
+            0x7e => Ok(Instr::LD8(
+                        Arg8::Reg(R::A),
+                        Arg8::Mem(MemAddr::Reg(SR::HL))
+                    )),
+            0x7f => Ok(Instr::LD8(
+                        Arg8::Reg(R::A),
+                        Arg8::Reg(R::A)
+                    )),
+            /* }}} */
             _ => Err(Error::new(ErrorKind::InvalidData, "unexpected opcode")),
         }
     }
@@ -753,6 +817,7 @@ impl Cpu {
             Instr::DEC16(a)         => self.dec16(a),
             Instr::DJNZ(a)          => self.djnz(a),
             Instr::EX(a1, a2)       => self.ex(a1, a2),
+            Instr::HALT             => self.halt(),
             Instr::INC8(a)          => self.inc8(a),
             Instr::INC16(a)         => self.inc16(a),
             Instr::JR(f, a)         => self.jr(f, a),
@@ -885,6 +950,11 @@ impl Cpu {
 
     fn ex(&mut self, dst: &Arg16, src: &Arg16) -> Result<PC, Error> {
         // TODO: shadow registers
+        Ok(PC::I)
+    }
+
+    fn halt(&mut self) -> Result<PC, Error> {
+        // TODO: halt
         Ok(PC::I)
     }
 
