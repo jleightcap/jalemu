@@ -256,17 +256,12 @@ impl Cpu {
     #[cfg(not(tarpaulin_include))]
     fn fw(&mut self, f: &Flag, b: bool) {
         fn bot(b: bool) -> u8 {
-            match b {
-                false => 0,
-                true  => 1,
-            }
+            if b { 1 } else { 0 }
         }
         match f {
             Flag::C  => {
                 self.f &= !(1 << 0);
-                println!("{:0>8b}", self.f);
                 self.f |=  bot(b) << 0;
-                println!("{:0>8b}", self.f);
             }
             Flag::N  => {
                 self.f &= !(1 << 1);
@@ -936,15 +931,32 @@ impl Cpu {
     }
 
     fn adc8(&mut self, dst: &Arg8, src: &Arg8) -> Result<PC, Error> {
-        // TODO: ADC
-        Ok(PC::I)
+        fn bot(b: bool) -> u8 {
+            match b { false => 0, true  => 1, }
+        }
+        let (src, pc) = self.u8_arg(src)?;
+        match dst {
+            // adc R, X
+            Arg8::Reg(r)    => {
+                self.rw(r, self.rr(r)
+                               .wrapping_add(src).wrapping_add(bot(self.fr(&Flag::C))));
+                Ok(pc)
+            }
+            // adc *, X
+            Arg8::U8        => Err(Error::new(ErrorKind::InvalidData, "add to immediate")),
+            // adc [**], X
+            Arg8::Mem(_)    => Err(Error::new(ErrorKind::InvalidData, "add to immediate")),
+        }
     }
 
     fn add8(&mut self, dst: &Arg8, src: &Arg8) -> Result<PC, Error> {
         let (src, pc) = self.u8_arg(src)?;
         match dst {
             // add R, X
-            Arg8::Reg(r)    => { self.rw(r, self.rr(r).wrapping_add(src)); Ok(pc) }
+            Arg8::Reg(r)    => {
+                self.rw(r, self.rr(r).wrapping_add(src));
+                Ok(pc)
+            }
             // add *, X
             Arg8::U8        => Err(Error::new(ErrorKind::InvalidData, "add to immediate")),
             // add [**], X
@@ -956,7 +968,10 @@ impl Cpu {
         let (src, pc) = self.u16_arg(src)?;
         match dst {
             // add SR, X
-            Arg16::Reg(sr)  => { self.srw(sr, self.srr(sr).wrapping_add(src)); Ok(pc) }
+            Arg16::Reg(sr)  => {
+                self.srw(sr, self.srr(sr).wrapping_add(src));
+                Ok(pc)
+            }
             // add **, X
             Arg16::U16      => Err(Error::new(ErrorKind::InvalidData, "add to immediate")),
             // add [**], X
