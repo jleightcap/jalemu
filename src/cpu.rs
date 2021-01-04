@@ -125,7 +125,9 @@ enum Instr {
     RLCA,
     RRA,
     RRCA,
+    SBC8    (Arg8, Arg8),
     SCF,
+    SUB8    (Arg8),
 }
 /* }}} */
 
@@ -863,6 +865,64 @@ impl Cpu {
                         Arg8::Reg(R::A)
                     )),
             /* }}} */
+            /* 0x9X {{{ */
+            0x90 => Ok(Instr::SUB8(
+                        Arg8::Reg(R::B)
+                    )),
+            0x91 => Ok(Instr::SUB8(
+                        Arg8::Reg(R::C)
+                    )),
+            0x92 => Ok(Instr::SUB8(
+                        Arg8::Reg(R::D)
+                    )),
+            0x93 => Ok(Instr::SUB8(
+                        Arg8::Reg(R::E)
+                    )),
+            0x94 => Ok(Instr::SUB8(
+                        Arg8::Reg(R::H)
+                    )),
+            0x95 => Ok(Instr::SUB8(
+                        Arg8::Reg(R::L)
+                    )),
+            0x96 => Ok(Instr::SUB8(
+                        Arg8::Mem(MemAddr::Reg(SR::HL))
+                    )),
+            0x97 => Ok(Instr::SUB8(
+                        Arg8::Reg(R::A)
+                    )),
+            0x98 => Ok(Instr::SBC8(
+                        Arg8::Reg(R::A),
+                        Arg8::Reg(R::B)
+                    )),
+            0x99 => Ok(Instr::SBC8(
+                        Arg8::Reg(R::A),
+                        Arg8::Reg(R::C)
+                    )),
+            0x9a => Ok(Instr::SBC8(
+                        Arg8::Reg(R::A),
+                        Arg8::Reg(R::D)
+                    )),
+            0x9b => Ok(Instr::SBC8(
+                        Arg8::Reg(R::A),
+                        Arg8::Reg(R::E)
+                    )),
+            0x9c => Ok(Instr::SBC8(
+                        Arg8::Reg(R::A),
+                        Arg8::Reg(R::H)
+                    )),
+            0x9d => Ok(Instr::SBC8(
+                        Arg8::Reg(R::A),
+                        Arg8::Reg(R::L)
+                    )),
+            0x9e => Ok(Instr::SBC8(
+                        Arg8::Reg(R::A),
+                        Arg8::Mem(MemAddr::Reg(SR::HL))
+                    )),
+            0x9f => Ok(Instr::SBC8(
+                        Arg8::Reg(R::A),
+                        Arg8::Reg(R::A)
+                    )),
+            /* }}} */
             _ => Err(Error::new(ErrorKind::InvalidData, "unexpected opcode")),
         }
     }
@@ -891,7 +951,9 @@ impl Cpu {
             Instr::RLCA             => self.rlca(),
             Instr::RRA              => self.rra(),
             Instr::RRCA             => self.rrca(),
+            Instr::SBC8(a1, a2)     => self.sbc8(a1, a2),
             Instr::SCF              => self.scf(),
+            Instr::SUB8(a)          => self.sub8(a),
         }?;
 
         Ok(match pc {
@@ -1164,10 +1226,19 @@ impl Cpu {
         Ok(PC::I)
     }
 
+    fn sbc8(&mut self, a1: &Arg8, a2: &Arg8) -> Result<PC, Error> {
+        Ok(PC::I)
+    }
+
     fn scf(&mut self) -> Result<PC, Error> {
         self.fw(&Flag::C, true);
         Ok(PC::I)
     }
+
+    fn sub8(&mut self, a: &Arg8) -> Result<PC, Error> {
+        Ok(PC::I)
+    }
+
     /* }}} */
 }
 
