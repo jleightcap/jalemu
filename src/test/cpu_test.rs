@@ -223,7 +223,7 @@ fn test_flags() {
 
     assert_eq!(c.fr(&Flag::N), true); // N
     c.fw(&Flag::N, false);
-    assert_eq!(c.fr(&Flag::N), false); 
+    assert_eq!(c.fr(&Flag::N), false);
 
     assert_eq!(c.fr(&Flag::PV), true); // PV
     c.fw(&Flag::PV, false);
@@ -278,7 +278,7 @@ fn test_decode_0x0() -> Result<(), Error> {
     assert_eq!(i, Instr::LD8(Arg8::Reg(R::C), Arg8::U8));
     let i = c.decode(0x0f)?;
     assert_eq!(i, Instr::RRCA);
-    
+
     Ok(())
 }
 
